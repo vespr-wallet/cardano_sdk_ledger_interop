@@ -25,7 +25,7 @@ dev_dependencies:
   # bip32_ed25519:
   #   path: ../bip32-ed25519-dart
 
-dependency_overrides:
+# dependency_overrides:
   # ledger_cardano_plus:
   #   path: ../../ledger-cardano
   # ledger_flutter_plus:
