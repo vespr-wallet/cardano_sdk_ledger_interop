@@ -1,3 +1,7 @@
+## [0.5.5+1] - June 30, 2025
+
+- Improved and expanded the README documentation for open-source/public use. No code changes.
+
 ## [0.5.5] - June 30, 2025
 
 ## Changes
