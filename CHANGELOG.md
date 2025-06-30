@@ -1,3 +1,9 @@
+## [0.5.5] - June 30, 2025
+
+## Changes
+
+- Updated deps
+
 ## [0.5.3] - 20th of November 2024
 
 ## Bug Fixes
