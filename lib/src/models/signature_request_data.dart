@@ -14,6 +14,15 @@ class SignatureRequestData {
     required this.ledgerPubAccount,
   });
 
+  SignatureRequestData copyWith({
+    ParsedSigningRequest? ledgerSignRequest,
+    CardanoPubAccount? ledgerPubAccount,
+  }) =>
+      SignatureRequestData(
+        ledgerSignRequest: ledgerSignRequest ?? this.ledgerSignRequest,
+        ledgerPubAccount: ledgerPubAccount ?? this.ledgerPubAccount,
+      );
+
   @override
   String toString() {
     return "SignatureRequestData(ledgerSignRequest: $ledgerSignRequest, ledgerPubAccount: $ledgerPubAccount)";
