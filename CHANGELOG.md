@@ -1,3 +1,7 @@
+# 0.5.7
+
+- Support for Ledger Message Signing mapping
+
 # 0.5.6
 
 - Removed freezed dependency

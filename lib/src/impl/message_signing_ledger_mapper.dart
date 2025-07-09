@@ -2,7 +2,6 @@ import "package:cardano_dart_types/cardano_dart_types.dart";
 import "package:cardano_flutter_sdk/cardano_flutter_sdk.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
-import "../../cardano_sdk_ledger_interop.dart";
 import "../utils/derivation_utils.dart";
 
 const cip08SignHashThreshold = 100; // 100 hex characters
