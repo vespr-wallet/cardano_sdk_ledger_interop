@@ -1,23 +1,25 @@
 import "dart:typed_data";
 
 import "package:cardano_dart_types/cardano_dart_types.dart";
-import "package:cardano_flutter_sdk/cardano_flutter_sdk.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
-import "extensions/auxiliary_data_x.dart";
-import "extensions/certificate_x.dart";
-import "extensions/multi_asset_x.dart";
-import "extensions/required_signer_x.dart";
-import "extensions/tx_inputs_x.dart";
-import "extensions/tx_output_x.dart";
-import "extensions/voting_procedures_x.dart";
-import "extensions/withdrawal_x.dart";
-import "models/signature_request_data.dart";
-import "types.dart";
-import "utils/signing_mode_utils.dart";
+import "../../cardano_sdk_ledger_interop.dart";
+import "../extensions/auxiliary_data_x.dart";
+import "../extensions/certificate_x.dart";
+import "../extensions/multi_asset_x.dart";
+import "../extensions/required_signer_x.dart";
+import "../extensions/tx_inputs_x.dart";
+import "../extensions/tx_output_x.dart";
+import "../extensions/voting_procedures_x.dart";
+import "../extensions/withdrawal_x.dart";
+import "../utils/derivation_utils.dart";
+import "../utils/signing_mode_utils.dart";
 
-extension ShelleyTransactionMapper on CardanoTransaction {
+class TransactionSigningLedgerMapper {
+  const TransactionSigningLedgerMapper();
+
   Future<SignatureRequestData> toLedgerSigningRequest({
+    required CardanoTransaction tx,
     required NetworkId networkId,
     required String xPubBech32,
     required int accountIndex,
@@ -25,96 +27,20 @@ extension ShelleyTransactionMapper on CardanoTransaction {
     required int maxDeriveAddressCount,
     required Map<UtxoAndIndex, Bech32OrBase58CardanoAddress> inputUtxoToAddress,
   }) async {
-    final CardanoPubAccount cardanoPubAcc = await CardanoPubAccountWorkerFactory.instance.fromBech32XPub(xPubBech32);
-    final String stakeCredentialsHex = await cardanoPubAcc.stakeCredentialsHex();
+    final body = tx.body;
+    final auxiliaryData = tx.auxiliaryData;
 
-    final [paymentCreds, changeCreds] = await Future.wait([
-      cardanoPubAcc.deriveCredentialsHex(
-        startIndex: 0,
-        endIndex: maxDeriveAddressCount,
-        role: Bip32KeyRole.payment,
-      ),
-      cardanoPubAcc.deriveCredentialsHex(
-        startIndex: 0,
-        endIndex: maxDeriveAddressCount,
-        role: Bip32KeyRole.change,
-      ),
-    ]);
-
-    final Map<CredentialsHex, LedgerSigningPath> paymentCredsToSigningPath = Map.fromEntries(
-      paymentCreds.indexed.map(
-        (indexAndCred) => MapEntry(
-          indexAndCred.$2,
-          LedgerSigningPath.shelley(
-            account: accountIndex,
-            address: indexAndCred.$1,
-            role: ShelleyAddressRole.payment,
-          ),
-        ),
-      ),
+    final credsData = await DerivationUtils.deriveCredsToSigningPath(
+      xPubBech32: xPubBech32,
+      accountIndex: accountIndex,
+      maxDeriveAddressCount: maxDeriveAddressCount,
     );
 
-    final Map<CredentialsHex, LedgerSigningPath> changeCredsToSigningPath = Map.fromEntries(
-      changeCreds.indexed.map(
-        (indexAndCred) => MapEntry(
-          indexAndCred.$2,
-          LedgerSigningPath.shelley(
-            account: accountIndex,
-            address: indexAndCred.$1,
-            role: ShelleyAddressRole.change,
-          ),
-        ),
-      ),
-    );
-
-    // Should contain creds of all derivations
-    final Map<CredentialsHex, LedgerSigningPath> derivedCredsToSigningPath = {
-      ...paymentCredsToSigningPath,
-      ...changeCredsToSigningPath,
-      // Credentials in HEX
-      stakeCredentialsHex: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.stake,
-      ),
-      cardanoPubAcc.dRepDerivation.value.credentialsHex: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.drepCredential,
-      ),
-      cardanoPubAcc.constitutionalCommitteeColdDerivation.value.hexCredential: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.constitutionalCommitteeCold,
-      ),
-      cardanoPubAcc.constitutionalCommitteeHotDerivation.value.hexCredential: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.constitutionalCommitteeHot,
-      ),
-      // Raw Keys in HEX || NOT SURE IF WE ACTUALLY NEED THOSE HERE
-      // -- I think on-chain we'll only see the hex credentials, not the vkey
-      cardanoPubAcc.stakeKey.rawKey.hexEncode(): LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.stake,
-      ),
-      cardanoPubAcc.dRepDerivation.value.dRepKeyHex: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.drepCredential,
-      ),
-      cardanoPubAcc.constitutionalCommitteeColdDerivation.value.hexCCKey: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.constitutionalCommitteeCold,
-      ),
-      cardanoPubAcc.constitutionalCommitteeHotDerivation.value.hexCCKey: LedgerSigningPath.shelley(
-        account: accountIndex,
-        address: 0,
-        role: ShelleyAddressRole.constitutionalCommitteeHot,
-      ),
-    };
+    final derivedCredsToSigningPath = credsData.derivedCredsToSigningPath;
+    final stakeCredentialsHex = credsData.stakeCredentialsHex;
+    final cardanoPubAcc = credsData.cardanoPubAcc;
+    final paymentCredsToSigningPath = credsData.paymentCredsToSigningPath;
+    final changeCredsToSigningPath = credsData.changeCredsToSigningPath;
 
     final Map<UtxoAndIndex, LedgerSigningPath> inputUtxoToSigningPath = Map.fromEntries(
       inputUtxoToAddress.entries.map((entry) {
@@ -237,6 +163,26 @@ extension ShelleyTransactionMapper on CardanoTransaction {
       ledgerPubAccount: cardanoPubAcc,
     );
   }
+}
+
+extension ShelleyTransactionMapper on CardanoTransaction {
+  @Deprecated("Use TransactionSigningLedgerMapper class instead to allow mocking for tests")
+  Future<SignatureRequestData> toLedgerSigningRequest({
+    required NetworkId networkId,
+    required String xPubBech32,
+    required int accountIndex,
+    // Ideally this maxDeriveAddressCount should be based on the payment creds observed on chain
+    required int maxDeriveAddressCount,
+    required Map<UtxoAndIndex, Bech32OrBase58CardanoAddress> inputUtxoToAddress,
+  }) =>
+      const TransactionSigningLedgerMapper().toLedgerSigningRequest(
+        tx: this,
+        networkId: networkId,
+        xPubBech32: xPubBech32,
+        accountIndex: accountIndex,
+        maxDeriveAddressCount: maxDeriveAddressCount,
+        inputUtxoToAddress: inputUtxoToAddress,
+      );
 }
 
 extension _Uint8ListX on Uint8List {
