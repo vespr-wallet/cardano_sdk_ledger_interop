@@ -2,6 +2,7 @@ import "package:cardano_dart_types/cardano_dart_types.dart";
 import "package:cardano_flutter_sdk/cardano_flutter_sdk.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
+import "../../cardano_sdk_ledger_interop.dart";
 import "../utils/derivation_utils.dart";
 
 const cip08SignHashThreshold = 100; // 100 hex characters
@@ -35,6 +36,56 @@ class MessageSigningLedgerMapper {
 
     // final requestedAddress = CardanoAddress.fromHexString(requestedSignerHex);
 
+    ParsedMessageData dataFromAnyCreds(String credsHex) {
+      final signingPath = derivedCredsToSigningPath[credsHex];
+      if (signingPath == null) {
+        throw SigningAddressNotFoundException(
+          missingAddresses: {credsHex},
+          searchedAddressesCount: deriveMaxAddressCount,
+        );
+      }
+
+      final parsedAddressParams = switch (signingPath.role) {
+        ShelleyAddressRole.payment || ShelleyAddressRole.change => ParsedAddressParams.shelley(
+            shelleyAddressParams: ShelleyAddressParamsData.basePaymentKeyStakeKey(
+              spendingDataSource: SpendingDataSourcePath(path: signingPath),
+              stakingDataSource: StakingDataSourceKey(
+                data: StakingDataSourceKeyData.path(
+                  // We'll just assume that staking path is the default one
+                  path: LedgerSigningPath.shelley(account: accountIndex, address: 0, role: ShelleyAddressRole.stake),
+                ),
+              ),
+            ),
+          ),
+        ShelleyAddressRole.stake => ParsedAddressParams.shelley(
+            shelleyAddressParams: ShelleyAddressParamsData.rewardKey(
+              stakingDataSource: StakingDataSourceKey(
+                data: StakingDataSourceKeyData.path(path: signingPath),
+              ),
+            ),
+          ),
+        ShelleyAddressRole.drepCredential => null, // drep doesn't have address param
+        ShelleyAddressRole.constitutionalCommitteeCold => null, // cc cold doesn't have address param
+        ShelleyAddressRole.constitutionalCommitteeHot => null, // cc hot doesn't have address param
+      };
+
+      final parsedMessageData = parsedAddressParams != null
+          ? ParsedMessageData.address(
+              messageHex: messageHex,
+              signingPath: signingPath,
+              hashPayload: hashPayload,
+              address: parsedAddressParams,
+            )
+          : ParsedMessageData.keyHash(
+              // this is drep or cc signing
+              messageHex: messageHex,
+              signingPath: signingPath,
+              hashPayload: hashPayload,
+            );
+
+      return parsedMessageData;
+    }
+
     ParsedMessageData dataFromAddress(CardanoAddress requestedSigningAddress) {
       final LedgerSigningPath_Shelley signingPath = () {
         final path = derivedCredsToSigningPath[requestedSigningAddress.credentials];
@@ -43,7 +94,7 @@ class MessageSigningLedgerMapper {
         } else {
           throw SigningAddressNotFoundException(
             missingAddresses: {requestedSigningAddress.bech32Encoded},
-            searchedAddressesCount: 1,
+            searchedAddressesCount: deriveMaxAddressCount,
           );
         }
       }();
@@ -92,7 +143,7 @@ class MessageSigningLedgerMapper {
       if (!drepIdOrCredsHex.endsWith(dRepCredentialsHex)) {
         throw SigningAddressNotFoundException(
           missingAddresses: {requestedSignerRaw},
-          searchedAddressesCount: 1,
+          searchedAddressesCount: deriveMaxAddressCount,
         );
       }
 
@@ -106,15 +157,14 @@ class MessageSigningLedgerMapper {
 
     final data = switch (requestedSignerHex.length) {
       // This is used for dRep (CIP-95)
-      //
-      // NOTE: In the future, we can maybe also check against any other payment/change/stake/cc credentials
-      //   (since the 56 bytes creds do not include the header which tells us the creds type)
-      56 => dataFromDrepIdOrCreds(requestedSignerHex),
+      56 => dataFromAnyCreds(requestedSignerHex),
       // 58 or 114 is the length of the stake or receive address hex
       58 => () {
           final requestedSignerBytes = requestedSignerHex.hexDecode();
           final headerBytes = requestedSignerBytes[0];
+
           return headerBytes & 0x0f > 1
+              // We don't really currently check for cc. Maybe we should use dataFromAnyCreds instead?
               ? dataFromDrepIdOrCreds(requestedSignerHex)
               : dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex));
         }(),
@@ -132,7 +182,7 @@ class MessageSigningLedgerMapper {
   ///
   /// Cross-reference the cose construction with {signCip8Data} below:
   /// https://github.com/input-output-hk/cardano-js-sdk/blob/master/packages/hardware-ledger/src/LedgerKeyAgent.ts
-  static Future<DataSignature> toDataSignature({
+  Future<DataSignature> toDataSignature({
     required SignedMessageData data,
     required String payloadHex,
   }) async {
