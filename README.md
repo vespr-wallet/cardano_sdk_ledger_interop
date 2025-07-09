@@ -3,7 +3,7 @@
 [![pub package](https://img.shields.io/pub/v/cardano_sdk_ledger_interop.svg)](https://pub.dev/packages/cardano_sdk_ledger_interop)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Cardano SDK Ledger Interop** is a Dart package that bridges the gap between [cardano_dart_types](https://github.com/vespr-wallet/cardano_dart_types), [cardano_flutter_sdk](https://github.com/vespr-wallet/cardano_flutter_sdk), and [ledger_cardano_plus](https://pub.dev/packages/ledger_cardano_plus). It provides the essential mapping and conversion logic to serialize Cardano transactions and related data structures for use with Ledger hardware wallets.
+**Cardano SDK Ledger Interop** is a Dart package that bridges the gap between [cardano_dart_types](https://github.com/vespr-wallet/cardano_dart_types), [cardano_flutter_sdk](https://github.com/vespr-wallet/cardano_dart_sdk), and [ledger_cardano_plus](https://pub.dev/packages/ledger_cardano_plus). It provides the essential mapping and conversion logic to serialize Cardano transactions and related data structures for use with Ledger hardware wallets.
 
 ---
 
