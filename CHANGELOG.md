@@ -1,3 +1,7 @@
+# 0.5.8
+
+- Added option to enforce whether payload should be hashed for MessageSigning
+
 # 0.5.7
 
 - Support for Ledger Message Signing mapping

@@ -301,6 +301,109 @@ void main() async {
 
           expect(data, equals(expected));
         });
+
+        group("shouldHashPayload parameter", () {
+          test("should force hashing when explicitly set to true for short message", () async {
+            const shortPayloadHex = "48656c6c6f"; // "Hello" - only 10 hex chars
+
+            final data = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: shortPayloadHex,
+              requestedSignerRaw: (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).bech32Encoded,
+              shouldHashPayload: true,
+            );
+
+            expect(data.hashPayload, equals(true));
+          });
+
+          test("should not hash when explicitly set to false for long message", () async {
+            final longPayloadHex = "546869732069732061207465737420706179616f6164" * 10; // > 100 hex chars
+
+            final data = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: longPayloadHex,
+              requestedSignerRaw: (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).bech32Encoded,
+              shouldHashPayload: false,
+            );
+
+            expect(data.hashPayload, equals(false));
+          });
+
+          test("should use default behavior when shouldHashPayload is null", () async {
+            const shortPayloadHex = "48656c6c6f"; // "Hello" - only 10 hex chars
+            final longPayloadHex = "546869732069732061207465737420706179616f6164" * 10; // > 100 hex chars
+
+            final shortData = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: shortPayloadHex,
+              requestedSignerRaw: (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).bech32Encoded,
+              shouldHashPayload: null,
+            );
+
+            final longData = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: longPayloadHex,
+              requestedSignerRaw: (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).bech32Encoded,
+              shouldHashPayload: null,
+            );
+
+            expect(shortData.hashPayload, equals(false), reason: "Short message should not be hashed by default");
+            expect(longData.hashPayload, equals(true), reason: "Long message should be hashed by default");
+          });
+
+          test("should work with different address types when shouldHashPayload is set", () async {
+            const payloadHex = "546869732069732061207465737420706179616f6164";
+
+            // Test with stake address
+            final stakeData = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: payloadHex,
+              requestedSignerRaw: await ledgerPubAccount.stakeAddress(NetworkId.mainnet),
+              shouldHashPayload: true,
+            );
+
+            expect(stakeData.hashPayload, equals(true));
+
+            // Test with enterprise address
+            final enterpriseAddress = CardanoAddress.fromHexPaymentCredentials(
+              paymentCredentials: (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).credentials,
+              networkId: NetworkId.mainnet,
+            );
+
+            final enterpriseData = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: payloadHex,
+              requestedSignerRaw: enterpriseAddress.bech32Encoded,
+              shouldHashPayload: false,
+            );
+
+            expect(enterpriseData.hashPayload, equals(false));
+
+            // Test with DRep
+            final drepData = await mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 10,
+              messageHex: payloadHex,
+              requestedSignerRaw: ledgerPubAccount.dRepDerivation.value.dRepIdNewBech32,
+              shouldHashPayload: true,
+            );
+
+            expect(drepData.hashPayload, equals(true));
+          });
+        });
       });
 
       group("Error Cases", () {

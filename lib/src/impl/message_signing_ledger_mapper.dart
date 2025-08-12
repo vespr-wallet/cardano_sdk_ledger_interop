@@ -12,11 +12,12 @@ class MessageSigningLedgerMapper {
   const MessageSigningLedgerMapper();
 
   Future<ParsedMessageData> toParsedMessageData({
-    required String xPubBech32,
-    required int accountIndex,
-    required int deriveMaxAddressCount,
-    required String messageHex,
-    required String requestedSignerRaw, // expected bech32 or hex
+    required final String xPubBech32,
+    required final int accountIndex,
+    required final int deriveMaxAddressCount,
+    required final String messageHex, // raw message hex
+    required final String requestedSignerRaw, // expected bech32 or hex
+    final bool? shouldHashPayload, // if null, messages above 100 hex characters will be hashed
   }) async {
     final credsData = await DerivationUtils.deriveCredsToSigningPath(
       xPubBech32: xPubBech32,
@@ -26,7 +27,7 @@ class MessageSigningLedgerMapper {
 
     final derivedCredsToSigningPath = credsData.derivedCredsToSigningPath;
     final dRepCredentialsHex = credsData.dRepCredentialsHex;
-    final hashPayload = _shouldHashPayload(messageHex);
+    final hashPayload = shouldHashPayload ?? _shouldHashPayload(messageHex);
 
     // if it's a bech32, convert it to hex
     final requestedSignerHex = ["addr", "stake", "drep", "cc_hot", "cc_cold"].any(requestedSignerRaw.startsWith)
