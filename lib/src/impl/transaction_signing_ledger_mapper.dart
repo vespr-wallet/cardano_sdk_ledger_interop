@@ -56,8 +56,8 @@ class TransactionSigningLedgerMapper {
       }).nonNulls,
     );
 
-    final parsedCertificates = body.certs
-        ?.map(
+    final parsedCertificates = body.certs?.certificates
+        .map(
           (e) => e.toParsedCertificate(
             accountIndex: accountIndex,
             stakeCredsHex: stakeCredentialsHex,

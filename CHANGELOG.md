@@ -1,3 +1,7 @@
+# 0.5.9
+
+- Updated Cardano SDK dependency to ^3.0.0
+
 # 0.5.8
 
 - Added option to enforce whether payload should be hashed for MessageSigning

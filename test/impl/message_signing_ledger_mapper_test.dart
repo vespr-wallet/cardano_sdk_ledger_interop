@@ -6,7 +6,7 @@ import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 import "package:pinenacl/encoding.dart";
 import "package:test/test.dart";
 
-enum _AddEncoding { bech32, hex, hex_cred }
+enum _AddEncoding { bech32, hex, hexCred }
 
 void main() async {
   const xPubBech32 =
@@ -107,7 +107,7 @@ void main() async {
                         (await ledgerPubAccount.paymentAddress(addrIndex, NetworkId.mainnet)).bech32Encoded,
                       _AddEncoding.hex =>
                         (await ledgerPubAccount.paymentAddress(addrIndex, NetworkId.mainnet)).hexEncoded,
-                      _AddEncoding.hex_cred => null,
+                      _AddEncoding.hexCred => null,
                     };
                     if (signer == null) {
                       // Not-applicable for this encoding
@@ -156,7 +156,7 @@ void main() async {
                               (await ledgerPubAccount.paymentAddress(addrIndex, NetworkId.mainnet)).credentials,
                           networkId: NetworkId.mainnet,
                         ).hexEncoded,
-                      _AddEncoding.hex_cred => null,
+                      _AddEncoding.hexCred => null,
                     };
                     if (signer == null) {
                       // Not-applicable for this encoding
@@ -197,7 +197,7 @@ void main() async {
                     messageHex: rawPayloadHex,
                     requestedSignerRaw: switch (encoding) {
                       _AddEncoding.bech32 => (await ledgerPubAccount.stakeAddress(NetworkId.mainnet)),
-                      _AddEncoding.hex_cred => (await ledgerPubAccount.stakeAddress(NetworkId.mainnet)).bech32ToHex(),
+                      _AddEncoding.hexCred => (await ledgerPubAccount.stakeAddress(NetworkId.mainnet)).bech32ToHex(),
                       _AddEncoding.hex => (await ledgerPubAccount.stakeCredentialsHex()),
                     },
                   );
@@ -228,7 +228,7 @@ void main() async {
                     messageHex: rawPayloadHex,
                     requestedSignerRaw: switch (encoding) {
                       _AddEncoding.bech32 => ledgerPubAccount.dRepDerivation.value.dRepIdNewBech32,
-                      _AddEncoding.hex_cred => ledgerPubAccount.dRepDerivation.value.dRepIdNewHex,
+                      _AddEncoding.hexCred => ledgerPubAccount.dRepDerivation.value.dRepIdNewHex,
                       _AddEncoding.hex => ledgerPubAccount.dRepDerivation.value.credentialsHex,
                     },
                   );
@@ -251,7 +251,7 @@ void main() async {
                     messageHex: rawPayloadHex,
                     requestedSignerRaw: switch (encoding) {
                       _AddEncoding.bech32 => ledgerPubAccount.dRepDerivation.value.dRepIdLegacyBech32,
-                      _AddEncoding.hex_cred => ledgerPubAccount.dRepDerivation.value.dRepIdLegacyHex,
+                      _AddEncoding.hexCred => ledgerPubAccount.dRepDerivation.value.dRepIdLegacyHex,
                       _AddEncoding.hex => ledgerPubAccount.dRepDerivation.value.credentialsHex,
                     },
                   );
