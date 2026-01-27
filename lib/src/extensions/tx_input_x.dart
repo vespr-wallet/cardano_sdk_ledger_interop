@@ -7,10 +7,10 @@ extension CardanoTransactionInputX on CardanoTransactionInput {
   ParsedInput toParsedInput({
     required Map<UtxoAndIndex, LedgerSigningPath> inputUtxoToSigningPath,
   }) {
-    final signingPath = inputUtxoToSigningPath["$transactionHash#$index"];
+    final signingPath = inputUtxoToSigningPath["${transactionHash.hexValue}#$index"];
 
     return ParsedInput(
-      txHashHex: transactionHash,
+      txHashHex: transactionHash.hexValue,
       outputIndex: index,
       path: signingPath,
     );

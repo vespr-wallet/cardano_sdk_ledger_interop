@@ -10,7 +10,7 @@ extension MultiAssetListX on List<MultiAsset> {
 extension MultiAssetX on MultiAsset {
   ParsedAssetGroup toParsedAssetGroup() {
     return ParsedAssetGroup(
-      policyIdHex: policyId,
+      policyIdHex: policyId.hexValue,
       tokens: assets.toParsedTokens(),
     );
   }
@@ -25,8 +25,8 @@ extension AssetListX on List<Asset> {
 extension AssetX on Asset {
   ParsedToken toParsedToken() {
     return ParsedToken(
-      assetNameHex: hexName,
-      amount: value,
+      assetNameHex: assetName.hexValue,
+      amount: value.toBigInt(),
     );
   }
 }

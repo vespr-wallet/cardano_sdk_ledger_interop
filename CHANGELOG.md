@@ -1,3 +1,8 @@
+# 0.6.0
+
+- [Breaking] Updated cardano_flutter_sdk dependency to ^4.0.0
+- Adapted mappers to new SDK API
+
 # 0.5.9
 
 - Updated Cardano SDK dependency to ^3.0.0

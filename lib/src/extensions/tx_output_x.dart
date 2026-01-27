@@ -29,7 +29,7 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
     required int accountIndex,
   }) {
     final output = this;
-    final destinationAddressHex = output.addressBytes.hexEncode();
+    final destinationAddressHex = output.address.hexValue;
     final destinationCardanoAddress = CardanoAddress.fromHexString(destinationAddressHex);
 
     final destinationCredentials = destinationCardanoAddress.credentials;
@@ -62,11 +62,11 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
 
     final tokenBundle = output.value.multiAssets
         .map((multiAsset) => ParsedAssetGroup(
-              policyIdHex: multiAsset.policyId,
+              policyIdHex: multiAsset.policyId.hexValue,
               tokens: multiAsset.assets
                   .map((asset) => ParsedToken(
-                        assetNameHex: asset.hexName,
-                        amount: asset.value,
+                        assetNameHex: asset.assetName.hexValue,
+                        amount: asset.value.toBigInt(),
                       ))
                   .toList(),
             ))
@@ -75,13 +75,13 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
     return switch (output) {
       CardanoTransactionOutput_Legacy() => ParsedOutput.alonzo(
           destination: destination,
-          amount: output.value.lovelace,
+          amount: output.value.lovelace.toBigInt(),
           tokenBundle: tokenBundle,
           datumHashHex: output.outDatumHash?.toParsedDatumHash(),
         ),
       CardanoTransactionOutput_PostAlonzo() => ParsedOutput.babbage(
           destination: destination,
-          amount: output.value.lovelace,
+          amount: output.value.lovelace.toBigInt(),
           tokenBundle: tokenBundle,
           datum: output.datum?.toParsedDatum(),
           referenceScriptHex: output.scriptRef?.hexEncode(),

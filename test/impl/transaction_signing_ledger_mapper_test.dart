@@ -287,10 +287,8 @@ void main() async {
                         spendingDataSource: SpendingDataSourcePath(
                           path: LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.payment),
                         ),
-                        stakingDataSource: StakingDataSourceKey(
-                          data: StakingDataSourceKeyData.path(
-                            path: LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.stake),
-                          ),
+                        stakingDataSource: StakingDataSource.keyPath(
+                          path: LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.stake),
                         ),
                       ),
                     ),
@@ -304,10 +302,8 @@ void main() async {
                         spendingDataSource: SpendingDataSourcePath(
                           path: LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.payment),
                         ),
-                        stakingDataSource: StakingDataSourceKey(
-                          data: StakingDataSourceKeyData.path(
-                            path: LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.stake),
-                          ),
+                        stakingDataSource: StakingDataSource.keyPath(
+                          path: LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.stake),
                         ),
                       ),
                     ),
