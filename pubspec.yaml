@@ -1,6 +1,6 @@
 name: cardano_sdk_ledger_interop
 description: Part of Cardano Flutter SDK containing the data models.
-version: 0.6.0
+version: 0.6.1
 homepage: https://github.com/vespr-wallet/cardano_sdk_ledger_interop
 repository: https://github.com/vespr-wallet/cardano_sdk_ledger_interop
 issue_tracker: https://github.com/vespr-wallet/cardano_sdk_ledger_interop/issues
@@ -11,7 +11,7 @@ environment:
 dependencies:
   cardano_dart_types: # no version specified | determined by cardano_flutter_sdk version
   cardano_flutter_sdk: ^4.0.0
-  ledger_cardano_plus: ^0.5.9
+  ledger_cardano_plus: ^0.5.10
   meta: ^1.16.0
 
 dev_dependencies:

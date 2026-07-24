@@ -33,9 +33,9 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cardano_sdk_ledger_interop: ^0.5.5
-  cardano_flutter_sdk: ^2.5.0
-  ledger_cardano_plus: ^0.5.5
+  cardano_sdk_ledger_interop: ^0.6.1
+  cardano_flutter_sdk: ^4.0.0
+  ledger_cardano_plus: ^0.5.10
   cardano_dart_types: # version as required by cardano_flutter_sdk
 ```
 
@@ -134,4 +134,3 @@ This project is licensed under the [MIT License](LICENSE).
 ## Maintainers
 
 - [VESPR Wallet](https://vespr.xyz)
-

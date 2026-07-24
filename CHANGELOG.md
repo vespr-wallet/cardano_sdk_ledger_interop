@@ -1,3 +1,9 @@
+# 0.6.1
+
+- Updated `ledger_cardano_plus` to ^0.5.10
+- Added Ledger Cardano app v8 mappings for combined Conway delegation certificates
+- Fixed Conway stake deregistration certificate mapping
+
 # 0.6.0
 
 - [Breaking] Updated cardano_flutter_sdk dependency to ^4.0.0

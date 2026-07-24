@@ -1,7 +1,6 @@
 import "package:cardano_dart_types/cardano_dart_types.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
-import "../errors/errors.dart";
 import "anchor_x.dart";
 import "credential_x.dart";
 import "drep_x.dart";
@@ -50,7 +49,7 @@ extension CertificateX on Certificate {
           ),
           deposit: cert.coin.toBigInt(),
         ),
-      Certificate_StakeDeRegistration() => ParsedCertificate.stakeRegistrationConway(
+      Certificate_StakeDeRegistration() => ParsedCertificate.stakeDeregistrationConway(
           stakeCredential: cert.stakeCredential.toParsedCredential(
             accountIndex: accountIndex,
             addressIndex: 0,
@@ -105,17 +104,56 @@ extension CertificateX on Certificate {
             account: accountIndex,
           ),
         ),
-      Certificate_StakeVoteDelegation() => throw NotSupportedError(
-          "StakeVoteDelegation certificate is not supported",
+      Certificate_StakeVoteDelegation() => ParsedCertificate.stakePoolAndDRepDelegation(
+          stakeCredential: cert.stakeCredential.toParsedCredential(
+            accountIndex: accountIndex,
+            addressIndex: 0,
+            role: ShelleyAddressRole.stake,
+            walletCredsHex: stakeCredsHex,
+          ),
+          poolKeyHashHex: cert.stakePoolId.hexPoolId,
+          dRep: cert.dRep.toParsedDRep(
+            walletDrepKeyHashHex: dRepKeyHashHex,
+            account: accountIndex,
+          ),
         ),
-      Certificate_StakeRegistrationDelegation() => throw NotSupportedError(
-          "StakeRegistrationDelegation certificate is not supported",
+      Certificate_StakeRegistrationDelegation() => ParsedCertificate.accountRegistrationDelegationToStakePool(
+          stakeCredential: cert.stakeCredential.toParsedCredential(
+            accountIndex: accountIndex,
+            addressIndex: 0,
+            role: ShelleyAddressRole.stake,
+            walletCredsHex: stakeCredsHex,
+          ),
+          deposit: cert.coin.toBigInt(),
+          poolKeyHashHex: cert.stakePoolId.hexPoolId,
         ),
-      Certificate_VoteRegistrationDelegation() => throw NotSupportedError(
-          "VoteRegistrationDelegation certificate is not supported",
+      Certificate_VoteRegistrationDelegation() => ParsedCertificate.accountRegistrationDelegationToDRep(
+          stakeCredential: cert.stakeCredential.toParsedCredential(
+            accountIndex: accountIndex,
+            addressIndex: 0,
+            role: ShelleyAddressRole.stake,
+            walletCredsHex: stakeCredsHex,
+          ),
+          deposit: cert.coin.toBigInt(),
+          dRep: cert.dRep.toParsedDRep(
+            walletDrepKeyHashHex: dRepKeyHashHex,
+            account: accountIndex,
+          ),
         ),
-      Certificate_StakeVoteRegistrationDelegation() => throw NotSupportedError(
-          "StakeVoteRegistrationDelegation certificate is not supported",
+      Certificate_StakeVoteRegistrationDelegation() =>
+        ParsedCertificate.accountRegistrationDelegationToStakePoolAndDRep(
+          stakeCredential: cert.stakeCredential.toParsedCredential(
+            accountIndex: accountIndex,
+            addressIndex: 0,
+            role: ShelleyAddressRole.stake,
+            walletCredsHex: stakeCredsHex,
+          ),
+          deposit: cert.coin.toBigInt(),
+          poolKeyHashHex: cert.stakePoolId.hexPoolId,
+          dRep: cert.dRep.toParsedDRep(
+            walletDrepKeyHashHex: dRepKeyHashHex,
+            account: accountIndex,
+          ),
         ),
       Certificate_AuthorizeCommitteeHot() => ParsedCertificate.authorizeCommitteeHot(
           coldCredential: cert.committeeColdCredential.toParsedCredential(

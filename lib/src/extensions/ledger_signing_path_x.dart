@@ -13,6 +13,9 @@ extension LedgerSigningPathX on LedgerSigningPath {
     final path = this;
 
     return switch (path) {
+      LedgerSigningPath_PoolCold() => throw UnsupportedError(
+          "Pool cold keys cannot be derived from a Shelley account public key",
+        ),
       LedgerSigningPath_Shelley() => (await cardanoPubAcc.rolePublicKey(path.role.bip32KeyRole, path.address)) //
           .rawKey
           .toUint8List(),

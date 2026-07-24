@@ -17,7 +17,7 @@ TransactionSigningModes determineSigningMode({
   required Uint8List? scriptDataHash,
   required String stakeCredentialsHex,
 }) {
-  final certsCreds = parsedCertificates
+  final certificateAuthorizingCredentials = parsedCertificates
       ?.map((parsedCert) => switch (parsedCert) {
             StakeRegistration() => parsedCert.stakeCredential,
             StakeRegistrationConway() => parsedCert.stakeCredential,
@@ -25,6 +25,10 @@ TransactionSigningModes determineSigningMode({
             StakeDeregistrationConway() => parsedCert.stakeCredential,
             StakeDelegation() => parsedCert.stakeCredential,
             VoteDelegation() => parsedCert.stakeCredential,
+            StakePoolAndDRepDelegation() => parsedCert.stakeCredential,
+            AccountRegistrationDelegationToStakePool() => parsedCert.stakeCredential,
+            AccountRegistrationDelegationToDRep() => parsedCert.stakeCredential,
+            AccountRegistrationDelegationToStakePoolAndDRep() => parsedCert.stakeCredential,
             AuthorizeCommitteeHot() => parsedCert.coldCredential,
             ResignCommitteeCold() => parsedCert.coldCredential,
             DRepRegistration() => parsedCert.dRepCredential,
@@ -39,7 +43,9 @@ TransactionSigningModes determineSigningMode({
   final hasPoolRegistrationCert = parsedCertificates?.any((parsedCert) => parsedCert is StakePoolRegistration) ?? false;
   final allCertsArePath =
       // ignore: avoid_bool_literals_in_conditional_expressions
-      hasPoolRegistrationCert ? false : certsCreds?.every((cred) => cred is CredentialKeyPath) ?? true;
+      hasPoolRegistrationCert
+          ? false
+          : certificateAuthorizingCredentials?.every((cred) => cred is CredentialKeyPath) ?? true;
 
   final hasCollateralInputs = collateralInputs?.isNotEmpty ?? false;
   final hasRequiredSigners = requiredSigners?.signersBytes.isNotEmpty ?? false;
@@ -74,7 +80,8 @@ TransactionSigningModes determineSigningMode({
 
   final allInputsAreThirdParty = inputs.every((input) => input.path == null);
   final allOutputsAreThirdParty = outputs.every((output) => output.destination is ThirdParty);
-  final someCertsAreScriptHash = certsCreds?.any((cred) => cred is CredentialScriptHash) ?? false;
+  final someCertsAreScriptHash =
+      certificateAuthorizingCredentials?.any((cred) => cred is CredentialScriptHash) ?? false;
 
   if (allInputsAreThirdParty &&
       allOutputsAreThirdParty &&
