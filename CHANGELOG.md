@@ -1,3 +1,7 @@
+# 0.6.2
+
+- Updated `ledger_cardano_plus` to ^0.6.1
+
 # 0.6.1
 
 - Updated `ledger_cardano_plus` to ^0.5.10
