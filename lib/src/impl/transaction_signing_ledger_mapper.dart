@@ -4,7 +4,6 @@ import "package:cardano_dart_types/cardano_dart_types.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
 import "../../cardano_sdk_ledger_interop.dart";
-import "../extensions/auxiliary_data_x.dart";
 import "../extensions/certificate_x.dart";
 import "../extensions/multi_asset_x.dart";
 import "../extensions/required_signer_x.dart";
@@ -28,7 +27,26 @@ class TransactionSigningLedgerMapper {
     required Map<UtxoAndIndex, Bech32OrBase58CardanoAddress> inputUtxoToAddress,
   }) async {
     final body = tx.body;
-    final auxiliaryData = tx.auxiliaryData;
+
+    // ParsedTransaction has no proposals field; dropping them would make the device sign a different body
+    if (body.proposalProcedures?.isNotEmpty ?? false) {
+      throw NotSupportedError("Proposal procedures are not supported for Ledger signing");
+    }
+
+    // Ledger takes a single tagCborSets flag for all sets, so mixed encodings can't be reproduced
+    final setTags = {
+      for (final tags in [
+        body.inputs.cborTags,
+        body.collateral?.cborTags,
+        body.referenceInputs?.cborTags,
+        body.certs?.cborTags,
+        body.requiredSigners?.cborTags,
+      ])
+        if (tags != null) tags.contains(258),
+    };
+    if (setTags.length > 1) {
+      throw NotSupportedError("Mixed CBOR set tag (258) encoding is not supported for Ledger signing");
+    }
 
     final credsData = await DerivationUtils.deriveCredsToSigningPath(
       xPubBech32: xPubBech32,
@@ -119,7 +137,10 @@ class TransactionSigningLedgerMapper {
       ttl: body.ttl?.toBigInt(),
       certificates: parsedCertificates,
       withdrawals: parsedWithdrawals,
-      auxiliaryData: auxiliaryData?.toParsedAuxiliaryData(),
+      // The body's key 7 is what gets signed, not whatever aux data happens to be attached
+      auxiliaryData: body.metadataHash == null
+          ? null
+          : ParsedTxAuxiliaryData.arbitraryHash(hashHex: body.metadataHash!.hexEncode()),
       validityIntervalStart: body.validityStartInterval?.toBigInt(),
       mint: body.mint?.toParsedAssetGroups(),
       scriptDataHashHex: body.scriptDataHash?.toScriptDataHash(),
@@ -144,7 +165,7 @@ class TransactionSigningLedgerMapper {
      * If false or not given, do not use the tags.
      */
     final options = ParsedTransactionOptions(
-      tagCborSets: body.inputs.cborTags.contains(258),
+      tagCborSets: setTags.single,
     );
 
     final ledgerSignRequest = ParsedSigningRequest(

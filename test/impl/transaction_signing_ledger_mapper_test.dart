@@ -334,4 +334,51 @@ void main() async {
       timeout: timeout,
     );
   });
+
+  group("fail closed on bodies Ledger can't reproduce", () {
+    Future<SignatureRequestData> map(String txHex) => mapper.toLedgerSigningRequest(
+          tx: CardanoTransaction.deserializeFromHex(txHex),
+          networkId: NetworkId.mainnet,
+          xPubBech32: xPubBech32,
+          accountIndex: 0,
+          maxDeriveAddressCount: 5,
+          inputUtxoToAddress: {
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#0":
+                "addr1qy2vzmtlgvjrhkq50rngh8d482zj3l20kyrc6kx4ffl3zfqayfawlf9hwv2fzuygt2km5v92kvf8e3s3mk7ynxw77cwqf7zhh2",
+          },
+        );
+
+    test("rejects proposal procedures", () {
+      expect(
+        map("84a40081825820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0001818258390011111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222221a001e8480021a00030d401481841b000000174876e800581de0999999999999999999999999999999999999999999999999999999998302a1581de0999999999999999999999999999999999999999999999999999999991b000000012a05f200f682782168747470733a2f2f61747461636b65722e6578616d706c652f70726f706f73616c5820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbba0f5f6"),
+        throwsA(isA<NotSupportedError>()),
+      );
+    });
+
+    test("rejects mixed set tags (tagged certs, untagged inputs)", () {
+      expect(
+        map("84a40081825820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0001818258390011111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222221a001e8480021a00030d4004d901028182008200581c33333333333333333333333333333333333333333333333333333333a0f5f6"),
+        throwsA(isA<NotSupportedError>()),
+      );
+    });
+
+    test("rejects mixed set tags (tagged inputs, untagged certs)", () {
+      expect(
+        map("84a400d9010281825820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0001818258390011111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222221a001e8480021a00030d40048182008200581c33333333333333333333333333333333333333333333333333333333a0f5f6"),
+        throwsA(isA<NotSupportedError>()),
+      );
+    });
+
+    test("forwards body metadata hash, not the attached aux data hash", () async {
+      for (final txHex in [
+        // key 7 set, no aux data
+        "84a40081825820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0001818258390011111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222221a001e8480021a00030d40075820cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccca0f5f6",
+        // key 7 set, different aux data attached
+        "84a40081825820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0001818258390011111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222221a001e8480021a00030d40075820cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccca0f5a11902a2a1636d7367816f62656e69676e206d65746164617461",
+      ]) {
+        final req = await map(txHex);
+        expect(req.ledgerSignRequest.tx.auxiliaryData, ParsedTxAuxiliaryData.arbitraryHash(hashHex: "cc" * 32));
+      }
+    });
+  });
 }
