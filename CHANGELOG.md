@@ -9,7 +9,7 @@
   - Bodies the device would re-encode differently throw `NotSupportedError` upfront: body or output map keys out of ascending order (`CardanoTransaction.hasAscendingBodyKeyOrder`), and indefinite-length CBOR lists, maps, byte strings or text strings anywhere in the body (`cardano_dart_types` 3.1 keeps the original encoding)
 - [Breaking] Removed `cip08SignHashThreshold`. By default a message is hashed only when it does not fit the device's first chunk unhashed: 198 bytes when displayable as text, 99 bytes otherwise (`ledger_cardano_plus` limits). Plain-text messages between 50 and 198 bytes are no longer hashed by default; pass `shouldHashPayload` to force either behaviour
 - Message signing for a base address requires a key/key header and the wallet's own stake key; a base address with a foreign stake credential or a script stake part throws `SigningAddressNotFoundException` instead of being signed as the wallet's base address
-- CIP-129 constitutional committee hot and cold ids resolve to the wallet's CC keys; they were checked only against the DRep credential and reported as not found
+- CIP-129 constitutional committee hot and cold ids resolve to the wallet's CC keys; they were checked only against the DRep credential and reported as not found. The id's header is now validated: the key type must match the wallet key found behind it (`SigningAddressNotFoundException` otherwise), and script-hash or reserved headers throw `SigningAddressNotValidException`
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
 # 0.6.2

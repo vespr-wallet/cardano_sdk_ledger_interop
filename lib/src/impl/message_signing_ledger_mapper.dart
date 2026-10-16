@@ -141,14 +141,34 @@ class MessageSigningLedgerMapper {
       return parsedMessageData;
     }
 
+    // CIP-129 id: the header's high nibble is the key type (0 CC hot, 1 CC cold, 2 DRep) and the low nibble the
+    // credential type (2 key hash, 3 script hash). The key behind the id must be the wallet key of that type.
+    ParsedMessageData dataFromGovernanceId(ShelleyAddressRole role) {
+      final signingPath = derivedCredsToSigningPath[requestedSignerHex.substring(2)];
+      if (signingPath == null || signingPath.role != role) {
+        throw SigningAddressNotFoundException(
+          missingAddresses: {requestedSignerRaw},
+          searchedAddressesCount: deriveMaxAddressCount,
+        );
+      }
+      return ParsedMessageData.keyHash(messageHex: messageHex, signingPath: signingPath, hashPayload: hashPayload);
+    }
+
     final data = switch (requestedSignerHex.length) {
       // Bare credential hex (payment, stake, DRep CIP-105, CC)
       56 => dataFromAnyCreds(requestedSignerHex),
-      // 29 bytes: a reward or enterprise address, or a CIP-129 governance id (DRep, CC hot, CC cold). CIP-129 puts
-      // the credential type in the header's low nibble as 2 (key hash) or 3 (script hash); addresses have 0 or 1.
-      58 => requestedSignerHex.hexDecode().first & 0x0f > 1
-          ? dataFromAnyCreds(requestedSignerHex.substring(2))
-          : dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
+      // 29 bytes: a CIP-129 governance id, or a reward or enterprise address (header low nibble 0 or 1)
+      58 => switch (requestedSignerHex.hexDecode().first) {
+          0x02 => dataFromGovernanceId(ShelleyAddressRole.constitutionalCommitteeHot),
+          0x12 => dataFromGovernanceId(ShelleyAddressRole.constitutionalCommitteeCold),
+          0x22 => dataFromGovernanceId(ShelleyAddressRole.drepCredential),
+          // Script-hash ids and reserved key types: no Ledger key can sign for these
+          final header when header & 0x0f > 1 => throw SigningAddressNotValidException(
+              hexInvalidAddressOrCredential: requestedSignerHex,
+              signingContext: "When signing payload message",
+            ),
+          _ => dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
+        },
       114 => dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
       _ => throw SigningAddressNotValidException(
           hexInvalidAddressOrCredential: requestedSignerHex,

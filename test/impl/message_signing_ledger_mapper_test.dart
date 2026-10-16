@@ -463,17 +463,35 @@ void main() async {
           });
         }
 
-        test("script governance ids are not ours", () async {
-          await expectLater(
-            () => mapper.toParsedMessageData(
-              xPubBech32: xPubBech32,
-              accountIndex: 0,
-              deriveMaxAddressCount: 1,
-              messageHex: payloadHex,
-              requestedSignerRaw: "23${"33" * 28}",
-            ),
-            throwsA(isA<SigningAddressNotFoundException>()),
-          );
+        test("script-hash and reserved governance ids are rejected", () async {
+          for (final signer in ["23${"33" * 28}", "32${cases.first.credential}"]) {
+            await expectLater(
+              () => mapper.toParsedMessageData(
+                xPubBech32: xPubBech32,
+                accountIndex: 0,
+                deriveMaxAddressCount: 1,
+                messageHex: payloadHex,
+                requestedSignerRaw: signer,
+              ),
+              throwsA(isA<SigningAddressNotValidException>()),
+            );
+          }
+        });
+
+        test("a wallet credential under another key type's header is not ours", () async {
+          final drepCredential = ledgerPubAccount.dRepDerivation.value.credentialsHex;
+          for (final signer in ["22${cases.first.credential}", "02$drepCredential"]) {
+            await expectLater(
+              () => mapper.toParsedMessageData(
+                xPubBech32: xPubBech32,
+                accountIndex: 0,
+                deriveMaxAddressCount: 1,
+                messageHex: payloadHex,
+                requestedSignerRaw: signer,
+              ),
+              throwsA(isA<SigningAddressNotFoundException>()),
+            );
+          }
         });
       });
 
