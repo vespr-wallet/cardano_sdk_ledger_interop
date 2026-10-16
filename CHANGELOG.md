@@ -7,6 +7,7 @@
   - The body's metadata hash (key 7) is forwarded verbatim instead of being recomputed from the attached auxiliary data
   - The CBOR set tag (258) flag is derived from inputs, collateral, reference inputs, certificates and required signers; mixed encodings throw `NotSupportedError`
   - Bodies the device would re-encode differently throw `NotSupportedError` upfront: body or output map keys out of ascending order (`CardanoTransaction.hasAscendingBodyKeyOrder`), and indefinite-length CBOR lists, maps, byte strings or text strings anywhere in the body (`cardano_dart_types` 3.1 keeps the original encoding)
+- Signing mode selection follows the ledgerjs rules: ordinary mode requires key-path certificate credentials, withdrawals and voters and no collateral inputs, collateral output, total collateral or reference inputs; multisig mode requires all of those as script hashes, third-party inputs and outputs and no pool retirement; anything else signs in plutus mode. Inputs no longer need a wallet path for ordinary mode
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
 # 0.6.2
