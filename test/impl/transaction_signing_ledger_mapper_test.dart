@@ -365,6 +365,13 @@ void main() async {
       final req = await mapWith(inputAddress: externalAddress, maxDeriveAddressCount: 5);
       expect(req.ledgerSignRequest.tx.inputs.single.path, isNull);
     });
+
+    test("keeps script inputs with our stake key third party", () async {
+      final stakeCredentials = await ledgerPubAccount.stakeCredentialsHex();
+      final scriptAddress = CardanoAddress.fromHexString("11${"33" * 28}$stakeCredentials").bech32Encoded;
+      final req = await mapWith(inputAddress: scriptAddress, maxDeriveAddressCount: 5);
+      expect(req.ledgerSignRequest.tx.inputs.single.path, isNull);
+    });
   });
 
   group("fail closed on bodies Ledger can't reproduce", () {

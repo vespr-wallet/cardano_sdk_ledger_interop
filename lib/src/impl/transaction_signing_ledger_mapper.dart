@@ -86,9 +86,13 @@ class TransactionSigningLedgerMapper {
     // ponytail: wallet enterprise addresses have no stake part to recognise them by; there the window is the caller's.
     for (final input in [...body.inputs.data, ...?body.collateral?.data]) {
       final utxo = "${input.transactionHash.hexValue}#${input.index}";
-      final address = inputUtxoToAddress[utxo];
-      if (address == null || inputUtxoToSigningPath.containsKey(utxo)) continue;
-      if (CardanoAddress.fromBech32OrBase58(address).stakeCredentials == stakeCredentialsHex) {
+      final addressBech32 = inputUtxoToAddress[utxo];
+      if (addressBech32 == null || inputUtxoToSigningPath.containsKey(utxo)) continue;
+      final address = CardanoAddress.fromBech32OrBase58(addressBech32);
+      // Script inputs that keep our stake key (DEX orders, contracts) need no payment-key witness: third party.
+      final isOurKeyAddress =
+          address.stakeCredentials == stakeCredentialsHex && address.credentialsType.value == CredentialType.key;
+      if (isOurKeyAddress) {
         throw InvalidTransactionError(
           "Input $utxo is at a wallet address whose payment key is beyond the first $maxDeriveAddressCount addresses",
         );
