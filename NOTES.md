@@ -1,10 +1,5 @@
 # Flutter SDK Notes
 
-## BUILD RUNNER:
-```
-flutter packages pub run build_runner build
-```
-
 ## COMMIT BUG FIX BY NUMBER:
 ```
 git commit -m "fix #xxx"

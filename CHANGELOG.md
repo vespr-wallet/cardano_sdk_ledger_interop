@@ -1,3 +1,13 @@
+# 0.7.0
+
+- [Breaking] Updated `cardano_flutter_sdk` dependency to ^5.2.0 (`cardano_dart_types` 3.1.2)
+- Adapted the voting procedures mapper to the new `VotingProcedures.voting` shape (each voter's votes paired with their CBOR length type)
+- The transaction mapper fails closed on bodies Ledger can't reproduce, instead of letting the device sign a different body than the one submitted:
+  - Proposal procedures (body key 20) throw `NotSupportedError`; they have no Ledger representation and were silently dropped
+  - The body's metadata hash (key 7) is forwarded verbatim instead of being recomputed from the attached auxiliary data
+  - The CBOR set tag (258) flag is derived from inputs, collateral, reference inputs, certificates and required signers; mixed encodings throw `NotSupportedError`
+- Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
+
 # 0.6.2
 
 - Updated `ledger_cardano_plus` to ^0.6.1
