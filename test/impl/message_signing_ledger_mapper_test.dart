@@ -20,12 +20,6 @@ void main() async {
       mapper = const MessageSigningLedgerMapper();
     });
 
-    group("Constants", () {
-      test("cip08SignHashThreshold should be 100", () {
-        expect(cip08SignHashThreshold, equals(100));
-      });
-    });
-
     group("toDataSignature", () {
       test("hashed payload returns correctly", () async {
         const payloadHex = "546869732069732061207465737420706179616f6164"; // "This is a test payaoad"
@@ -406,7 +400,100 @@ void main() async {
         });
       });
 
+      group("default hashing", () {
+        Future<bool> hashedByDefault(String messageHex) async {
+          final data = await mapper.toParsedMessageData(
+            xPubBech32: xPubBech32,
+            accountIndex: 0,
+            deriveMaxAddressCount: 1,
+            messageHex: messageHex,
+            requestedSignerRaw: (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).bech32Encoded,
+          );
+          return data.hashPayload;
+        }
+
+        test("text messages are hashed only beyond the 198-byte first chunk", () async {
+          expect(await hashedByDefault("61" * 198), isFalse);
+          expect(await hashedByDefault("61" * 199), isTrue);
+        });
+
+        test("binary messages are hashed only beyond the 99-byte first chunk", () async {
+          expect(await hashedByDefault("ff" * 99), isFalse);
+          expect(await hashedByDefault("ff" * 100), isTrue);
+        });
+      });
+
+      group("constitutional committee CIP-129 ids", () {
+        const payloadHex = "48656c6c6f";
+        final cases = [
+          (
+            hrp: "cc_hot",
+            header: "02",
+            credential: ledgerPubAccount.constitutionalCommitteeHotDerivation.value.hexCredential,
+            role: ShelleyAddressRole.constitutionalCommitteeHot,
+          ),
+          (
+            hrp: "cc_cold",
+            header: "12",
+            credential: ledgerPubAccount.constitutionalCommitteeColdDerivation.value.hexCredential,
+            role: ShelleyAddressRole.constitutionalCommitteeCold,
+          ),
+        ];
+
+        for (final testCase in cases) {
+          test(testCase.hrp, () async {
+            final idHex = "${testCase.header}${testCase.credential}";
+            for (final signer in [idHex, idHex.hexDecode().bech32Encode(testCase.hrp)]) {
+              final data = await mapper.toParsedMessageData(
+                xPubBech32: xPubBech32,
+                accountIndex: 0,
+                deriveMaxAddressCount: 1,
+                messageHex: payloadHex,
+                requestedSignerRaw: signer,
+              );
+              expect(
+                data,
+                ParsedMessageData.keyHash(
+                  messageHex: payloadHex,
+                  signingPath: LedgerSigningPath.shelley(account: 0, address: 0, role: testCase.role),
+                  hashPayload: false,
+                ),
+              );
+            }
+          });
+        }
+
+        test("script governance ids are not ours", () async {
+          await expectLater(
+            () => mapper.toParsedMessageData(
+              xPubBech32: xPubBech32,
+              accountIndex: 0,
+              deriveMaxAddressCount: 1,
+              messageHex: payloadHex,
+              requestedSignerRaw: "23${"33" * 28}",
+            ),
+            throwsA(isA<SigningAddressNotFoundException>()),
+          );
+        });
+      });
+
       group("Error Cases", () {
+        test("base address with a foreign or script stake part is not ours", () async {
+          final paymentCredentials = (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).credentials;
+          for (final addressHex in ["01$paymentCredentials${"33" * 28}", "21$paymentCredentials${"33" * 28}"]) {
+            await expectLater(
+              () => mapper.toParsedMessageData(
+                xPubBech32: xPubBech32,
+                accountIndex: 0,
+                deriveMaxAddressCount: 1,
+                messageHex: "48656c6c6f",
+                requestedSignerRaw: addressHex,
+              ),
+              throwsA(isA<SigningAddressNotFoundException>()),
+            );
+          }
+        });
+
         test("address not found", () async {
           const payloadHex = "546869732069732061207465737420706179616f6164"; // "This is a test payaoad"
           final signer = (await ledgerPubAccount.paymentAddress(10, NetworkId.mainnet)).bech32Encoded;
