@@ -7,6 +7,8 @@
   - The body's metadata hash (key 7) is forwarded verbatim instead of being recomputed from the attached auxiliary data
   - The CBOR set tag (258) flag is derived from inputs, collateral, reference inputs, certificates and required signers; mixed encodings throw `NotSupportedError`
   - Bodies the device would re-encode differently throw `NotSupportedError` upfront: body or output map keys out of ascending order (`CardanoTransaction.hasAscendingBodyKeyOrder`), and indefinite-length CBOR lists, maps, byte strings or text strings anywhere in the body (`cardano_dart_types` 3.1 keeps the original encoding)
+- Fixed DRep registration and committee cold resignation certificates dropping their anchor; the device signed the certificate without it, so the witness was rejected by the node after the user approved
+- Pool registration and pool retirement certificates throw `NotSupportedError`; the previous mapping was incomplete (no relays, stake path sent as the pool key) and could never reach the device correctly
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
 # 0.6.2
