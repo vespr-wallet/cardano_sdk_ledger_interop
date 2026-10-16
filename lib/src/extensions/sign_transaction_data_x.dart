@@ -5,12 +5,12 @@ import "../errors/errors.dart";
 import "ledger_signing_path_x.dart";
 
 extension SignedTransactionDataX on SignedTransactionData {
-  /// The witnesses for [tx]. Throws [InvalidTransactionError] when the hash the device signed is not the body hash
-  /// of [tx], so a witness is never attached to a transaction it does not sign.
+  /// The witnesses for [tx]. The returned future fails with [InvalidTransactionError] when the hash the device signed
+  /// is not the body hash of [tx], so a witness is never attached to a transaction it does not sign.
   Future<List<WitnessVKey>> witnessesVKey({
     required CardanoPubAccount cardanoPubAcc,
     required CardanoTransaction tx,
-  }) {
+  }) async {
     final bodyHashHex = tx.body.blake2bHash256Hex().toLowerCase();
     if (txHashHex.toLowerCase() != bodyHashHex) {
       throw InvalidTransactionError("Ledger signed body hash $txHashHex but the transaction body hash is $bodyHashHex");

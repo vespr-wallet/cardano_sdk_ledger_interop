@@ -26,11 +26,10 @@ void main() async {
     expect(witnesses.single.signature, ("11" * 64).hexDecode());
   });
 
-  test("throws when the device signed a different body hash", () {
-    expect(
-      () => signed("00" * 32).witnessesVKey(cardanoPubAcc: pubAccount, tx: tx),
-      throwsA(isA<InvalidTransactionError>()),
-    );
+  test("fails through the returned future when the device signed a different body hash", () async {
+    // Must not throw synchronously: callers handle signing failures on the future
+    final result = signed("00" * 32).witnessesVKey(cardanoPubAcc: pubAccount, tx: tx);
+    await expectLater(result, throwsA(isA<InvalidTransactionError>()));
   });
 
   test("Byron witness paths are rejected", () {
