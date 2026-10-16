@@ -37,28 +37,34 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
     final maybeDestinationPath =
         paymentCredsToSigningPath[destinationCredentials] ?? changeCredsToSigningPath[destinationCredentials];
 
-    final destination = maybeDestinationPath != null
-        ? ParsedOutputDestination.deviceOwned(
-            addressParams: ParsedAddressParams.shelley(
-              shelleyAddressParams: destinationStakeCredentialsHex == null
-                  ? ShelleyAddressParamsData.enterpriseKey(
-                      spendingDataSource: SpendingDataSourcePath(path: maybeDestinationPath),
+    // The device rebuilds a device-owned address from the params, so the params must describe the exact address type.
+    // Shelley header high nibble: 0 = base key/key, 6 = enterprise key. Anything else that still has our payment key
+    // (base key/script 2, pointer 4) is forwarded verbatim as third party.
+    // ponytail: map 2 and 4 to basePaymentKeyStakeScript / pointerKey if a wallet ever derives such addresses.
+    final headerType = destinationCardanoAddress.bytes.first >> 4;
+    final destination = switch ((maybeDestinationPath, headerType, destinationStakeCredentialsHex)) {
+      (final path?, 0x0, final stakeHex?) => ParsedOutputDestination.deviceOwned(
+          addressParams: ParsedAddressParams.shelley(
+            shelleyAddressParams: ShelleyAddressParamsData.basePaymentKeyStakeKey(
+              spendingDataSource: SpendingDataSourcePath(path: path),
+              stakingDataSource: stakingCredentialsHex == stakeHex
+                  ? StakingDataSource.keyPath(
+                      path:
+                          LedgerSigningPath.shelley(account: accountIndex, address: 0, role: ShelleyAddressRole.stake),
                     )
-                  : ShelleyAddressParamsData.basePaymentKeyStakeKey(
-                      spendingDataSource: SpendingDataSourcePath(path: maybeDestinationPath),
-                      stakingDataSource: stakingCredentialsHex == destinationStakeCredentialsHex
-                          ? StakingDataSource.keyPath(
-                              path: LedgerSigningPath.shelley(
-                                account: accountIndex,
-                                address: 0,
-                                role: ShelleyAddressRole.stake,
-                              ),
-                            )
-                          : StakingDataSource.keyHash(keyHashHex: destinationStakeCredentialsHex),
-                    ),
+                  : StakingDataSource.keyHash(keyHashHex: stakeHex),
             ),
-          )
-        : ParsedOutputDestination.thirdParty(addressHex: destinationAddressHex);
+          ),
+        ),
+      (final path?, 0x6, _) => ParsedOutputDestination.deviceOwned(
+          addressParams: ParsedAddressParams.shelley(
+            shelleyAddressParams: ShelleyAddressParamsData.enterpriseKey(
+              spendingDataSource: SpendingDataSourcePath(path: path),
+            ),
+          ),
+        ),
+      _ => ParsedOutputDestination.thirdParty(addressHex: destinationAddressHex),
+    };
 
     final tokenBundle = output.value.multiAssets
         .map((multiAsset) => ParsedAssetGroup(

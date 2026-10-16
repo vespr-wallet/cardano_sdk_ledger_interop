@@ -7,6 +7,7 @@
   - The body's metadata hash (key 7) is forwarded verbatim instead of being recomputed from the attached auxiliary data
   - The CBOR set tag (258) flag is derived from inputs, collateral, reference inputs, certificates and required signers; mixed encodings throw `NotSupportedError`
   - Bodies the device would re-encode differently throw `NotSupportedError` upfront: body or output map keys out of ascending order (`CardanoTransaction.hasAscendingBodyKeyOrder`), and indefinite-length CBOR lists, maps, byte strings or text strings anywhere in the body (`cardano_dart_types` 3.1 keeps the original encoding)
+- Output destinations are classified by the address header: only base key/key and enterprise addresses paying to a wallet key are sent as device-owned params; base key/script and pointer addresses paying to a wallet key are forwarded as third party (they were sent as base key/key or enterprise params, so the device signed a different address)
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
 # 0.6.2
