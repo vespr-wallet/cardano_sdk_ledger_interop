@@ -48,6 +48,13 @@ class TransactionSigningLedgerMapper {
       throw NotSupportedError("Mixed CBOR set tag (258) encoding is not supported for Ledger signing");
     }
 
+    // Ledger rebuilds the body canonically from the parsed fields (definite lengths, ascending integer map keys),
+    // so any other encoding would be signed as different bytes. cardano_dart_types keeps the original encoding.
+    if (!tx.hasAscendingBodyKeyOrder) {
+      throw NotSupportedError("Transaction body keys are not in ascending order; Ledger can't reproduce this body");
+    }
+    _assertLedgerReproducible(body.serialize(forJson: false));
+
     final credsData = await DerivationUtils.deriveCredsToSigningPath(
       xPubBech32: xPubBech32,
       accountIndex: accountIndex,
@@ -208,4 +215,39 @@ extension ShelleyTransactionMapper on CardanoTransaction {
 
 extension _Uint8ListX on Uint8List {
   ScriptDataHash toScriptDataHash() => ScriptDataHash(hexString: hexEncode());
+}
+
+/// Throws [NotSupportedError] on the first item in [value] that Ledger would re-encode differently:
+/// indefinite-length lists, maps, byte strings and text strings, and maps whose integer keys are not ascending
+/// (post-Alonzo outputs). Inline datums and reference scripts are opaque byte strings here, matching what the
+/// device receives.
+void _assertLedgerReproducible(CborValue value) {
+  final (lengthType, kind) = switch (value) {
+    CborList() => (value.type, "list"),
+    CborMap() => (value.type, "map"),
+    CborBytes() => (value.type, "byte string"),
+    CborString() => (value.type, "text string"),
+    _ => (CborLengthType.definite, ""),
+  };
+  if (lengthType == CborLengthType.indefinite) {
+    throw NotSupportedError("Indefinite-length CBOR $kind in the transaction body; Ledger can't reproduce this body");
+  }
+
+  if (value is CborMap) {
+    final keys = value.keys.toList();
+    if (keys.every((key) => key is CborInt)) {
+      final intKeys = keys.cast<CborInt>().map((key) => key.toBigInt()).toList();
+      for (var i = 1; i < intKeys.length; i++) {
+        if (intKeys[i] <= intKeys[i - 1]) {
+          throw NotSupportedError("CBOR map keys are not in ascending order; Ledger can't reproduce this body");
+        }
+      }
+    }
+    value.forEach((key, item) {
+      _assertLedgerReproducible(key);
+      _assertLedgerReproducible(item);
+    });
+  } else if (value is CborList) {
+    value.forEach(_assertLedgerReproducible);
+  }
 }

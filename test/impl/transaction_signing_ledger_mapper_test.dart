@@ -369,6 +369,40 @@ void main() async {
       );
     });
 
+    group("non-canonical CBOR encoding", () {
+      final input = "825820${"aa" * 32}00";
+      final address = "583900${"11" * 28}${"22" * 28}";
+      final output = "82${address}1a001e8480";
+      const fee = "1a00030d40";
+      String tx(String body) => "84${body}a0f5f6";
+      Matcher rejectedBecause(String reason) =>
+          throwsA(isA<NotSupportedError>().having((e) => e.message, "message", contains(reason)));
+
+      test("accepts the canonical body", () async {
+        await map(tx("a30081${input}0181${output}02$fee"));
+      });
+
+      test("rejects body keys out of ascending order", () {
+        expect(map(tx("a302${fee}0081${input}0181$output")), rejectedBecause("not in ascending order"));
+      });
+
+      test("rejects output map keys out of ascending order", () {
+        expect(
+            map(tx("a30081${input}0181a2011a001e848000${address}02$fee")), rejectedBecause("not in ascending order"));
+      });
+
+      test("rejects indefinite-length inputs", () {
+        expect(map(tx("a3009f${input}ff0181${output}02$fee")), rejectedBecause("Indefinite-length CBOR list"));
+      });
+
+      test("rejects indefinite-length votes map of a voter", () {
+        final voter = "8202581c${"dd" * 28}";
+        final vote = "825820${"ee" * 32}008201f6";
+        final body = "a40081${input}0181${output}02${fee}13a1${voter}bf${vote}ff";
+        expect(map(tx(body)), rejectedBecause("Indefinite-length CBOR map"));
+      });
+    });
+
     test("forwards body metadata hash, not the attached aux data hash", () async {
       for (final txHex in [
         // key 7 set, no aux data
