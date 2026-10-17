@@ -335,6 +335,45 @@ void main() async {
     );
   });
 
+  group("derivation window", () {
+    final txHex = "84a30081825820${"aa" * 32}00018182583900${"11" * 28}${"22" * 28}1a001e8480021a00030d40a0f5f6";
+    Future<SignatureRequestData> mapWith({required String inputAddress, required int maxDeriveAddressCount}) =>
+        mapper.toLedgerSigningRequest(
+          tx: CardanoTransaction.deserializeFromHex(txHex),
+          networkId: NetworkId.mainnet,
+          xPubBech32: xPubBech32,
+          accountIndex: 0,
+          maxDeriveAddressCount: maxDeriveAddressCount,
+          inputUtxoToAddress: {"${"aa" * 32}#0": inputAddress},
+        );
+
+    test("rejects a spent wallet input whose payment key is past the window", () async {
+      final walletAddress10 = (await ledgerPubAccount.paymentAddress(10, NetworkId.mainnet)).bech32Encoded;
+      expect(
+        mapWith(inputAddress: walletAddress10, maxDeriveAddressCount: 5),
+        throwsA(isA<InvalidTransactionError>()),
+      );
+      final req = await mapWith(inputAddress: walletAddress10, maxDeriveAddressCount: 11);
+      expect(
+        req.ledgerSignRequest.tx.inputs.single.path,
+        LedgerSigningPath.shelley(account: 0, address: 10, role: ShelleyAddressRole.payment),
+      );
+    });
+
+    test("keeps external inputs third party", () async {
+      final externalAddress = CardanoAddress.fromHexString("01${"11" * 28}${"22" * 28}").bech32Encoded;
+      final req = await mapWith(inputAddress: externalAddress, maxDeriveAddressCount: 5);
+      expect(req.ledgerSignRequest.tx.inputs.single.path, isNull);
+    });
+
+    test("keeps script inputs with our stake key third party", () async {
+      final stakeCredentials = await ledgerPubAccount.stakeCredentialsHex();
+      final scriptAddress = CardanoAddress.fromHexString("11${"33" * 28}$stakeCredentials").bech32Encoded;
+      final req = await mapWith(inputAddress: scriptAddress, maxDeriveAddressCount: 5);
+      expect(req.ledgerSignRequest.tx.inputs.single.path, isNull);
+    });
+  });
+
   group("fail closed on bodies Ledger can't reproduce", () {
     Future<SignatureRequestData> map(String txHex) => mapper.toLedgerSigningRequest(
           tx: CardanoTransaction.deserializeFromHex(txHex),
