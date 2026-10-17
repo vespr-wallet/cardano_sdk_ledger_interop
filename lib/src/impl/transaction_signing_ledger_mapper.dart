@@ -134,19 +134,6 @@ class TransactionSigningLedgerMapper {
       poolKeyHashHex: "TODO: UNSUPORTED YET",
     );
 
-    final signingMode = determineSigningMode(
-      parsedCertificates: parsedCertificates,
-      stakeCredentialsHex: stakeCredentialsHex,
-      inputs: parsedInputs,
-      outputs: parsedOutputs,
-      withdrawals: body.withdrawals,
-      collateralInputs: parsedCollateralInputs,
-      mint: body.mint,
-      requiredSigners: body.requiredSigners,
-      scriptDataHash: body.scriptDataHash,
-      votingProcedures: parsedVoterVotes,
-    );
-
     final parsedRequiredSigners = body.requiredSigners?.toParsedRequiredSigners(
       derivedCredsToSigningPath: derivedCredsToSigningPath,
     );
@@ -184,6 +171,7 @@ class TransactionSigningLedgerMapper {
       treasury: body.currentTreasuryValue?.toBigInt(),
       referenceInputs: body.referenceInputs?.toParsedInputs(inputUtxoToSigningPath: inputUtxoToSigningPath),
     );
+    final signingMode = determineSigningMode(parsedTransaction);
 
     /**
      * If true, serialize transactions with 258 tags for all sets (optional since Conway).

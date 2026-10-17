@@ -1,165 +1,80 @@
-import "dart:typed_data";
-
-import "package:cardano_dart_types/cardano_dart_types.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
 import "../errors/errors.dart";
 
-TransactionSigningModes determineSigningMode({
-  required List<ParsedCertificate>? parsedCertificates,
-  required List<ParsedInput> inputs,
-  required List<ParsedOutput> outputs,
-  required List<ParsedInput>? collateralInputs,
-  required RequiredSigners? requiredSigners,
-  required List<Withdraw>? withdrawals,
-  required List<MultiAsset>? mint,
-  required List<ParsedVoterVotes>? votingProcedures,
-  required Uint8List? scriptDataHash,
-  required String stakeCredentialsHex,
-}) {
-  final certificateAuthorizingCredentials = parsedCertificates
-      ?.map((parsedCert) => switch (parsedCert) {
-            StakeRegistration() => parsedCert.stakeCredential,
-            StakeRegistrationConway() => parsedCert.stakeCredential,
-            StakeDeregistration() => parsedCert.stakeCredential,
-            StakeDeregistrationConway() => parsedCert.stakeCredential,
-            StakeDelegation() => parsedCert.stakeCredential,
-            VoteDelegation() => parsedCert.stakeCredential,
-            StakePoolAndDRepDelegation() => parsedCert.stakeCredential,
-            AccountRegistrationDelegationToStakePool() => parsedCert.stakeCredential,
-            AccountRegistrationDelegationToDRep() => parsedCert.stakeCredential,
-            AccountRegistrationDelegationToStakePoolAndDRep() => parsedCert.stakeCredential,
-            AuthorizeCommitteeHot() => parsedCert.coldCredential,
-            ResignCommitteeCold() => parsedCert.coldCredential,
-            DRepRegistration() => parsedCert.dRepCredential,
-            DRepDeregistration() => parsedCert.dRepCredential,
-            DRepUpdate() => parsedCert.dRepCredential,
-            StakePoolRegistration() => false,
-            StakePoolRetirement() => false,
-          })
-      .toList(growable: false);
+/// Picks the signing mode the device will accept, mirroring the per-mode rules of ledgerjs
+/// (`parseSignTransactionRequest`): ordinary when every credential the device witnesses is a key path, multisig when
+/// they are all script hashes, plutus otherwise. Pool registration has no mode this package can produce.
+TransactionSigningModes determineSigningMode(ParsedTransaction tx) {
+  final certificates = tx.certificates ?? const <ParsedCertificate>[];
+  if (certificates.any((cert) => cert is StakePoolRegistration)) {
+    throw InvalidTransactionError("Pool registration certificates have no supported Ledger signing mode");
+  }
 
-  final allInputsArePath = inputs.every((input) => input.path != null);
-  final hasPoolRegistrationCert = parsedCertificates?.any((parsedCert) => parsedCert is StakePoolRegistration) ?? false;
-  final allCertsArePath =
-      // ignore: avoid_bool_literals_in_conditional_expressions
-      hasPoolRegistrationCert
-          ? false
-          : certificateAuthorizingCredentials?.every((cred) => cred is CredentialKeyPath) ?? true;
+  final credentials = [
+    ...certificates.map(_authorizingCredential).nonNulls,
+    ...?tx.withdrawals?.map((withdrawal) => withdrawal.stakeCredential),
+  ];
+  final voterVotes = tx.votingProcedures ?? const <ParsedVoterVotes>[];
+  final hasCollateralOrReferenceInputs = (tx.collateralInputs?.isNotEmpty ?? false) ||
+      tx.collateralOutput != null ||
+      tx.totalCollateral != null ||
+      (tx.referenceInputs?.isNotEmpty ?? false);
+  // ponytail: the device allows required signers in every mode; keeping them out of ordinary and multisig preserves
+  // the previous behaviour (such transactions sign in plutus mode).
+  final hasRequiredSigners = tx.requiredSigners?.isNotEmpty ?? false;
 
-  final hasCollateralInputs = collateralInputs?.isNotEmpty ?? false;
-  final hasRequiredSigners = requiredSigners?.signersBytes.isNotEmpty ?? false;
+  if (hasCollateralOrReferenceInputs || hasRequiredSigners) return TransactionSigningModes.plutusTransaction;
 
-  final allVotingProceduresArePath = votingProcedures?.every((v) => switch (v.voter) {
-            CommitteeKeyPath() => true,
-            DrepKeyPath() => true,
-            StakePoolKeyPath() => true,
-            // if it's hash, reject it
-            CommitteeKeyHash() => false,
-            CommitteeScriptHash() => false,
-            DrepKeyHash() => false,
-            DrepScriptHash() => false,
-            StakePoolKeyHash() => false,
-          }) ??
-      true;
-
-  if (allInputsArePath &&
-      allCertsArePath &&
-      // allVotingProceduresArePath has been added despite not being mentioned in the JS library
-      // because when there's hash voting procedures (in the TS library), the tests are always using
-      // plutus transaciton type
-      allVotingProceduresArePath &&
-      !hasPoolRegistrationCert &&
-      !hasCollateralInputs &&
-      !hasRequiredSigners) {
-    // Checks omitted:
-    //  * - *must* contain only 1852 and 1855 paths
-    //  * - *must* contain 1855 witness requests only when transaction contains token minting/burning
+  if (credentials.every((credential) => credential is CredentialKeyPath) && voterVotes.every(_isKeyPathVoter)) {
     return TransactionSigningModes.ordinaryTransaction;
   }
 
-  final allInputsAreThirdParty = inputs.every((input) => input.path == null);
-  final allOutputsAreThirdParty = outputs.every((output) => output.destination is ThirdParty);
-  final someCertsAreScriptHash =
-      certificateAuthorizingCredentials?.any((cred) => cred is CredentialScriptHash) ?? false;
-
-  if (allInputsAreThirdParty &&
-      allOutputsAreThirdParty &&
-      !hasPoolRegistrationCert &&
-      someCertsAreScriptHash &&
-      !hasCollateralInputs &&
-      !hasRequiredSigners) {
-    // Checks omitted:
-    //  * - *must* contain only 1854 and 1855 witness requests
-    //  * - *must* contain 1855 witness requests only when transaction contains token minting/burning
+  // Inputs with a path would need 1852' witnesses, which multisig mode rejects (it signs with 1854' paths only).
+  if (tx.inputs.every((input) => input.path == null) &&
+      tx.outputs.every((output) => output.destination is ThirdParty) &&
+      certificates.every((cert) => cert is! StakePoolRetirement) &&
+      credentials.every((credential) => credential is CredentialScriptHash) &&
+      voterVotes.every(_isScriptHashVoter)) {
     return TransactionSigningModes.multisigTransaction;
   }
 
-  final noOutputsHaveDatum = outputs.every((output) => output.outputDatum == null);
-  final hasSinglePoolRegCertAsOwner = () {
-    if (parsedCertificates == null) return false;
-    if (parsedCertificates.length != 1) return false;
-
-    final cert = parsedCertificates.first;
-    if (cert is! StakePoolRegistration) return false;
-    if (cert.pool.owners.length != 1) return false;
-
-    final owner = cert.pool.owners.first;
-    return switch (owner) {
-      DeviceOwnedPoolOwner() => true,
-      ThirdPartyPoolOwner() => false,
-    };
-  }();
-  final hasWithdrawals = withdrawals?.isNotEmpty ?? false;
-  final hasMint = mint?.isNotEmpty ?? false;
-  final hasScriptDataHash = scriptDataHash != null;
-
-  if (allInputsAreThirdParty &&
-      allOutputsAreThirdParty &&
-      noOutputsHaveDatum &&
-      hasSinglePoolRegCertAsOwner &&
-      !hasWithdrawals &&
-      !hasMint &&
-      !hasScriptDataHash &&
-      !hasCollateralInputs &&
-      !hasRequiredSigners) {
-    // Checks omitted:
-    //  * - *must* contain only staking witness requests
-    return TransactionSigningModes.poolRegistrationAsOwner;
-  }
-
-  final hasSinglePoolRegCertAsOperator = () {
-    if (parsedCertificates == null) return false;
-    if (parsedCertificates.length != 1) return false;
-
-    final cert = parsedCertificates.first;
-    if (cert is! StakePoolRegistration) return false;
-    if (cert.pool.owners.length != 1) return false;
-
-    final owner = cert.pool.owners.first;
-    if (owner is! ThirdPartyPoolOwner) return false;
-
-    return switch (cert.pool.poolKey) {
-      DeviceOwnedPoolKey() => true,
-      ThirdPartyPoolKey() => false,
-    };
-  }();
-
-  if (allInputsArePath &&
-      noOutputsHaveDatum &&
-      hasSinglePoolRegCertAsOperator &&
-      !hasWithdrawals &&
-      !hasMint &&
-      !hasScriptDataHash &&
-      !hasCollateralInputs &&
-      !hasRequiredSigners) {
-    return TransactionSigningModes.poolRegistrationAsOperator;
-  }
-
-  if (hasPoolRegistrationCert) {
-    throw InvalidTransactionError(
-      "Transaction contains a pool registration certificate but does not meet any of the known signing modes",
-    );
-  }
   return TransactionSigningModes.plutusTransaction;
 }
+
+ParsedCredential? _authorizingCredential(ParsedCertificate cert) => switch (cert) {
+      StakeRegistration() => cert.stakeCredential,
+      StakeRegistrationConway() => cert.stakeCredential,
+      StakeDeregistration() => cert.stakeCredential,
+      StakeDeregistrationConway() => cert.stakeCredential,
+      StakeDelegation() => cert.stakeCredential,
+      VoteDelegation() => cert.stakeCredential,
+      StakePoolAndDRepDelegation() => cert.stakeCredential,
+      AccountRegistrationDelegationToStakePool() => cert.stakeCredential,
+      AccountRegistrationDelegationToDRep() => cert.stakeCredential,
+      AccountRegistrationDelegationToStakePoolAndDRep() => cert.stakeCredential,
+      AuthorizeCommitteeHot() => cert.coldCredential,
+      ResignCommitteeCold() => cert.coldCredential,
+      DRepRegistration() => cert.dRepCredential,
+      DRepDeregistration() => cert.dRepCredential,
+      DRepUpdate() => cert.dRepCredential,
+      // Pool certificates are witnessed by the pool cold key, not by a credential in the certificate.
+      StakePoolRegistration() => null,
+      StakePoolRetirement() => null,
+    };
+
+bool _isKeyPathVoter(ParsedVoterVotes voterVotes) => switch (voterVotes.voter) {
+      CommitteeKeyPath() || DrepKeyPath() || StakePoolKeyPath() => true,
+      CommitteeKeyHash() || CommitteeScriptHash() || DrepKeyHash() || DrepScriptHash() || StakePoolKeyHash() => false,
+    };
+
+bool _isScriptHashVoter(ParsedVoterVotes voterVotes) => switch (voterVotes.voter) {
+      CommitteeScriptHash() || DrepScriptHash() => true,
+      CommitteeKeyPath() ||
+      DrepKeyPath() ||
+      StakePoolKeyPath() ||
+      CommitteeKeyHash() ||
+      DrepKeyHash() ||
+      StakePoolKeyHash() =>
+        false,
+    };
