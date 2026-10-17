@@ -32,6 +32,20 @@ void main() async {
     await expectLater(result, throwsA(isA<InvalidTransactionError>()));
   });
 
+  test("compares against the body as it serializes now, not the hash cached when it was parsed", () async {
+    final modifiedTx = tx.copyWith(body: tx.body.copyWith(fee: const CborSmallInt(300000)));
+    final parseTimeHash = tx.body.blake2bHash256Hex();
+    final modifiedBodyHash = modifiedTx.body.computeBlake2bHash256().hexEncode();
+    expect(modifiedBodyHash, isNot(parseTimeHash));
+
+    final witnesses = await signed(modifiedBodyHash).witnessesVKey(cardanoPubAcc: pubAccount, tx: modifiedTx);
+    expect(witnesses, hasLength(1));
+    await expectLater(
+      signed(parseTimeHash).witnessesVKey(cardanoPubAcc: pubAccount, tx: modifiedTx),
+      throwsA(isA<InvalidTransactionError>()),
+    );
+  });
+
   test("Byron witness paths are rejected", () {
     expect(
       LedgerSigningPath.byron(account: 0, address: 0).vkeyHashBySigningPath(pubAccount),
