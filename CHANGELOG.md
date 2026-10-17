@@ -9,6 +9,9 @@
   - Bodies the device would re-encode differently throw `NotSupportedError` upfront: body or output map keys out of ascending order (`CardanoTransaction.hasAscendingBodyKeyOrder`), and indefinite-length CBOR lists, maps, byte strings or text strings anywhere in the body (`cardano_dart_types` 3.1 keeps the original encoding)
 - Fixed DRep registration and committee cold resignation certificates dropping their anchor; the device signed the certificate without it, so the witness was rejected by the node after the user approved
 - Pool registration and pool retirement certificates throw `NotSupportedError`; the previous mapping was incomplete (no relays, stake path sent as the pool key) and could never reach the device correctly
+- [Breaking] `SignedTransactionDataX.witnessesVKey` takes named `cardanoPubAcc` and `tx` arguments and throws `InvalidTransactionError` when the body hash the device signed differs from the hash of the transaction body as it serializes now (computed fresh, since `blake2bHash256Hex()` can return the hash cached at parse time even after `copyWith`), instead of returning witnesses for a different body
+- The transaction mapper throws `InvalidTransactionError` when a spent input or collateral is at a wallet base address whose payment key is beyond `maxDeriveAddressCount`; such inputs were silently treated as third party and the transaction would have been submitted without their witness
+- Byron witness paths throw `UnsupportedError` instead of returning the Shelley payment key as the witness vkey
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
 # 0.6.2
