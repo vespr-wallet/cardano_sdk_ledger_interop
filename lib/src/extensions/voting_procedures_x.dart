@@ -11,17 +11,17 @@ extension VotingProceduresX on VotingProcedures {
     required String hotCredentialKeyHashHex,
     required String poolKeyHashHex,
   }) =>
-      voting.entries
-          .map(
-            (e) => ParsedVoterVotes(
-              voter: e.key.toParseVoter(
-                accountIndex: accountIndex,
-                dRepKeyHashHex: dRepKeyHashHex,
-                hotCredentialKeyHashHex: hotCredentialKeyHashHex,
-                poolKeyHashHex: poolKeyHashHex,
-              ),
-              votes: e.value.toParsedVotes(),
-            ),
-          )
-          .toList();
+      voting.entries.map((e) {
+        // The CBOR length type of the voter's votes map is not part of the Ledger request
+        final (votes, _) = e.value;
+        return ParsedVoterVotes(
+          voter: e.key.toParseVoter(
+            accountIndex: accountIndex,
+            dRepKeyHashHex: dRepKeyHashHex,
+            hotCredentialKeyHashHex: hotCredentialKeyHashHex,
+            poolKeyHashHex: poolKeyHashHex,
+          ),
+          votes: votes.toParsedVotes(),
+        );
+      }).toList();
 }

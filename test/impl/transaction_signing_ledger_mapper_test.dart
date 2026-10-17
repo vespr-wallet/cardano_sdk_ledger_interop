@@ -335,6 +335,45 @@ void main() async {
     );
   });
 
+  group("derivation window", () {
+    final txHex = "84a30081825820${"aa" * 32}00018182583900${"11" * 28}${"22" * 28}1a001e8480021a00030d40a0f5f6";
+    Future<SignatureRequestData> mapWith({required String inputAddress, required int maxDeriveAddressCount}) =>
+        mapper.toLedgerSigningRequest(
+          tx: CardanoTransaction.deserializeFromHex(txHex),
+          networkId: NetworkId.mainnet,
+          xPubBech32: xPubBech32,
+          accountIndex: 0,
+          maxDeriveAddressCount: maxDeriveAddressCount,
+          inputUtxoToAddress: {"${"aa" * 32}#0": inputAddress},
+        );
+
+    test("rejects a spent wallet input whose payment key is past the window", () async {
+      final walletAddress10 = (await ledgerPubAccount.paymentAddress(10, NetworkId.mainnet)).bech32Encoded;
+      expect(
+        mapWith(inputAddress: walletAddress10, maxDeriveAddressCount: 5),
+        throwsA(isA<InvalidTransactionError>()),
+      );
+      final req = await mapWith(inputAddress: walletAddress10, maxDeriveAddressCount: 11);
+      expect(
+        req.ledgerSignRequest.tx.inputs.single.path,
+        LedgerSigningPath.shelley(account: 0, address: 10, role: ShelleyAddressRole.payment),
+      );
+    });
+
+    test("keeps external inputs third party", () async {
+      final externalAddress = CardanoAddress.fromHexString("01${"11" * 28}${"22" * 28}").bech32Encoded;
+      final req = await mapWith(inputAddress: externalAddress, maxDeriveAddressCount: 5);
+      expect(req.ledgerSignRequest.tx.inputs.single.path, isNull);
+    });
+
+    test("keeps script inputs with our stake key third party", () async {
+      final stakeCredentials = await ledgerPubAccount.stakeCredentialsHex();
+      final scriptAddress = CardanoAddress.fromHexString("11${"33" * 28}$stakeCredentials").bech32Encoded;
+      final req = await mapWith(inputAddress: scriptAddress, maxDeriveAddressCount: 5);
+      expect(req.ledgerSignRequest.tx.inputs.single.path, isNull);
+    });
+  });
+
   group("fail closed on bodies Ledger can't reproduce", () {
     Future<SignatureRequestData> map(String txHex) => mapper.toLedgerSigningRequest(
           tx: CardanoTransaction.deserializeFromHex(txHex),
@@ -367,6 +406,89 @@ void main() async {
         map("84a400d9010281825820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0001818258390011111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222221a001e8480021a00030d40048182008200581c33333333333333333333333333333333333333333333333333333333a0f5f6"),
         throwsA(isA<NotSupportedError>()),
       );
+    });
+
+    group("non-canonical CBOR encoding", () {
+      final input = "825820${"aa" * 32}00";
+      final address = "583900${"11" * 28}${"22" * 28}";
+      final output = "82${address}1a001e8480";
+      const fee = "1a00030d40";
+      String tx(String body) => "84${body}a0f5f6";
+      Matcher rejectedBecause(String reason) =>
+          throwsA(isA<NotSupportedError>().having((e) => e.message, "message", contains(reason)));
+
+      test("accepts the canonical body", () async {
+        await map(tx("a30081${input}0181${output}02$fee"));
+      });
+
+      test("rejects body keys out of ascending order", () {
+        expect(map(tx("a302${fee}0081${input}0181$output")), rejectedBecause("not in ascending order"));
+      });
+
+      test("rejects output map keys out of ascending order", () {
+        expect(
+            map(tx("a30081${input}0181a2011a001e848000${address}02$fee")), rejectedBecause("not in ascending order"));
+      });
+
+      test("rejects indefinite-length inputs", () {
+        expect(map(tx("a3009f${input}ff0181${output}02$fee")), rejectedBecause("Indefinite-length CBOR list"));
+      });
+
+      test("rejects indefinite-length inputs inside a tagged set", () {
+        // package:cbor attaches tag 258 to the list itself, so the walker sees the list and its length type
+        expect(map(tx("a300d901029f${input}ff0181${output}02$fee")), rejectedBecause("Indefinite-length CBOR list"));
+      });
+
+      test("rejects indefinite-length votes map of a voter", () {
+        final voter = "8202581c${"dd" * 28}";
+        final vote = "825820${"ee" * 32}008201f6";
+        final body = "a40081${input}0181${output}02${fee}13a1${voter}bf${vote}ff";
+        expect(map(tx(body)), rejectedBecause("Indefinite-length CBOR map"));
+      });
+    });
+
+    group("output destination by address type", () {
+      const walletPaymentCred = "14c16d7f43243bd81478e68b9db53a8528fd4fb1078d58d54a7f1124";
+      final paymentPath = LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.payment);
+
+      Future<ParsedOutputDestination> destinationOf(String addressHex) async {
+        final address = "58${(addressHex.length ~/ 2).toRadixString(16)}$addressHex";
+        final req = await map("84a30081825820${"aa" * 32}00018182${address}1a001e8480021a00030d40a0f5f6");
+        return req.ledgerSignRequest.tx.outputs.single.destination;
+      }
+
+      test("base key/key paying to our key is device owned", () async {
+        expect(
+          await destinationOf("01$walletPaymentCred${"33" * 28}"),
+          ParsedOutputDestination.deviceOwned(
+            addressParams: ParsedAddressParams.shelley(
+              shelleyAddressParams: ShelleyAddressParamsData.basePaymentKeyStakeKey(
+                spendingDataSource: SpendingDataSourcePath(path: paymentPath),
+                stakingDataSource: StakingDataSource.keyHash(keyHashHex: "33" * 28),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test("enterprise paying to our key is device owned", () async {
+        expect(
+          await destinationOf("61$walletPaymentCred"),
+          ParsedOutputDestination.deviceOwned(
+            addressParams: ParsedAddressParams.shelley(
+              shelleyAddressParams: ShelleyAddressParamsData.enterpriseKey(
+                spendingDataSource: SpendingDataSourcePath(path: paymentPath),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test("base key/script and pointer paying to our key are third party", () async {
+        for (final addressHex in ["21$walletPaymentCred${"33" * 28}", "41${walletPaymentCred}000000"]) {
+          expect(await destinationOf(addressHex), ParsedOutputDestination.thirdParty(addressHex: addressHex));
+        }
+      });
     });
 
     test("forwards body metadata hash, not the attached aux data hash", () async {

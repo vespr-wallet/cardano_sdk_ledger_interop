@@ -13,8 +13,6 @@ analyzer:
   exclude:
     #    - example/**
     - test/old/**
-    - lib/**.g.dart
-    - lib/**/*.freezed.dart
 
 formatter:
   page_width: 120

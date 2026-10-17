@@ -1,3 +1,24 @@
+# 0.7.0
+
+- [Breaking] Updated `cardano_flutter_sdk` dependency to ^5.2.0 (`cardano_dart_types` 3.1.2)
+- Adapted the voting procedures mapper to the new `VotingProcedures.voting` shape (each voter's votes paired with their CBOR length type)
+- The transaction mapper fails closed on bodies Ledger can't reproduce, instead of letting the device sign a different body than the one submitted:
+  - Proposal procedures (body key 20) throw `NotSupportedError`; they have no Ledger representation and were silently dropped
+  - The body's metadata hash (key 7) is forwarded verbatim instead of being recomputed from the attached auxiliary data
+  - The CBOR set tag (258) flag is derived from inputs, collateral, reference inputs, certificates and required signers; mixed encodings throw `NotSupportedError`
+  - Bodies the device would re-encode differently throw `NotSupportedError` upfront: body or output map keys out of ascending order (`CardanoTransaction.hasAscendingBodyKeyOrder`), and indefinite-length CBOR lists, maps, byte strings or text strings anywhere in the body (`cardano_dart_types` 3.1 keeps the original encoding)
+- [Breaking] Removed `cip08SignHashThreshold`. By default a message is hashed only when it does not fit the device's first chunk unhashed: 198 bytes when displayable as text, 99 bytes otherwise (`ledger_cardano_plus` limits). Plain-text messages between 50 and 198 bytes are no longer hashed by default; pass `shouldHashPayload` to force either behaviour
+- Message signing for a base address requires a key/key header and the wallet's own stake key; a base address with a foreign stake credential or a script stake part throws `SigningAddressNotFoundException` instead of being signed as the wallet's base address
+- CIP-129 constitutional committee hot and cold ids resolve to the wallet's CC keys; they were checked only against the DRep credential and reported as not found. The id's header is now validated: the key type must match the wallet key found behind it (`SigningAddressNotFoundException` otherwise), and script-hash or reserved headers throw `SigningAddressNotValidException`. A bech32 signer whose prefix disagrees with its payload (a `drep1` string wrapping a CC id or an address, a `stake1` string wrapping a base address) throws `SigningAddressNotValidException` instead of being signed with the key inside
+- Output destinations are classified by the address header: only base key/key and enterprise addresses paying to a wallet key are sent as device-owned params; base key/script and pointer addresses paying to a wallet key are forwarded as third party (they were sent as base key/key or enterprise params, so the device signed a different address)
+- Signing mode selection follows the ledgerjs rules: ordinary mode requires key-path certificate credentials, withdrawals and voters and no collateral inputs, collateral output, total collateral or reference inputs; multisig mode requires all of those as script hashes, third-party inputs and outputs and no pool retirement; anything else signs in plutus mode. Inputs no longer need a wallet path for ordinary mode
+- Fixed DRep registration and committee cold resignation certificates dropping their anchor; the device signed the certificate without it, so the witness was rejected by the node after the user approved
+- Pool registration and pool retirement certificates throw `NotSupportedError`; the previous mapping was incomplete (no relays, stake path sent as the pool key) and could never reach the device correctly
+- [Breaking] `SignedTransactionDataX.witnessesVKey` takes named `cardanoPubAcc` and `tx` arguments and throws `InvalidTransactionError` when the body hash the device signed differs from the hash of the transaction body as it serializes now (computed fresh, since `blake2bHash256Hex()` can return the hash cached at parse time even after `copyWith`), instead of returning witnesses for a different body
+- The transaction mapper throws `InvalidTransactionError` when a spent input or collateral is at a wallet base address whose payment key is beyond `maxDeriveAddressCount`; such inputs were silently treated as third party and the transaction would have been submitted without their witness
+- Byron witness paths throw `UnsupportedError` instead of returning the Shelley payment key as the witness vkey
+- Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
+
 # 0.6.2
 
 - Updated `ledger_cardano_plus` to ^0.6.1

@@ -48,6 +48,13 @@ class TransactionSigningLedgerMapper {
       throw NotSupportedError("Mixed CBOR set tag (258) encoding is not supported for Ledger signing");
     }
 
+    // Ledger rebuilds the body canonically from the parsed fields (definite lengths, ascending integer map keys),
+    // so any other encoding would be signed as different bytes. cardano_dart_types keeps the original encoding.
+    if (!tx.hasAscendingBodyKeyOrder) {
+      throw NotSupportedError("Transaction body keys are not in ascending order; Ledger can't reproduce this body");
+    }
+    _assertLedgerReproducible(body.serialize(forJson: false));
+
     final credsData = await DerivationUtils.deriveCredsToSigningPath(
       xPubBech32: xPubBech32,
       accountIndex: accountIndex,
@@ -73,6 +80,24 @@ class TransactionSigningLedgerMapper {
         return MapEntry(utxoAndIndex, maybePath);
       }).nonNulls,
     );
+
+    // A spent UTxO at one of our base addresses whose payment key is past maxDeriveAddressCount would get no witness,
+    // so fail here instead of after the user approved on the device. External inputs in the map stay third party.
+    // ponytail: wallet enterprise addresses have no stake part to recognise them by; there the window is the caller's.
+    for (final input in [...body.inputs.data, ...?body.collateral?.data]) {
+      final utxo = "${input.transactionHash.hexValue}#${input.index}";
+      final addressBech32 = inputUtxoToAddress[utxo];
+      if (addressBech32 == null || inputUtxoToSigningPath.containsKey(utxo)) continue;
+      final address = CardanoAddress.fromBech32OrBase58(addressBech32);
+      // Script inputs that keep our stake key (DEX orders, contracts) need no payment-key witness: third party.
+      final isOurKeyAddress =
+          address.stakeCredentials == stakeCredentialsHex && address.credentialsType.value == CredentialType.key;
+      if (isOurKeyAddress) {
+        throw InvalidTransactionError(
+          "Input $utxo is at a wallet address whose payment key is beyond the first $maxDeriveAddressCount addresses",
+        );
+      }
+    }
 
     final parsedCertificates = body.certs?.certificates
         .map(
@@ -107,19 +132,6 @@ class TransactionSigningLedgerMapper {
       hotCredentialKeyHashHex: cardanoPubAcc.constitutionalCommitteeHotDerivation.value.hexCredential,
       // TODOpoolKeyHashHex
       poolKeyHashHex: "TODO: UNSUPORTED YET",
-    );
-
-    final signingMode = determineSigningMode(
-      parsedCertificates: parsedCertificates,
-      stakeCredentialsHex: stakeCredentialsHex,
-      inputs: parsedInputs,
-      outputs: parsedOutputs,
-      withdrawals: body.withdrawals,
-      collateralInputs: parsedCollateralInputs,
-      mint: body.mint,
-      requiredSigners: body.requiredSigners,
-      scriptDataHash: body.scriptDataHash,
-      votingProcedures: parsedVoterVotes,
     );
 
     final parsedRequiredSigners = body.requiredSigners?.toParsedRequiredSigners(
@@ -159,6 +171,7 @@ class TransactionSigningLedgerMapper {
       treasury: body.currentTreasuryValue?.toBigInt(),
       referenceInputs: body.referenceInputs?.toParsedInputs(inputUtxoToSigningPath: inputUtxoToSigningPath),
     );
+    final signingMode = determineSigningMode(parsedTransaction);
 
     /**
      * If true, serialize transactions with 258 tags for all sets (optional since Conway).
@@ -208,4 +221,39 @@ extension ShelleyTransactionMapper on CardanoTransaction {
 
 extension _Uint8ListX on Uint8List {
   ScriptDataHash toScriptDataHash() => ScriptDataHash(hexString: hexEncode());
+}
+
+/// Throws [NotSupportedError] on the first item in [value] that Ledger would re-encode differently:
+/// indefinite-length lists, maps, byte strings and text strings, and maps whose integer keys are not ascending
+/// (post-Alonzo outputs). Inline datums and reference scripts are opaque byte strings here, matching what the
+/// device receives.
+void _assertLedgerReproducible(CborValue value) {
+  final (lengthType, kind) = switch (value) {
+    CborList() => (value.type, "list"),
+    CborMap() => (value.type, "map"),
+    CborBytes() => (value.type, "byte string"),
+    CborString() => (value.type, "text string"),
+    _ => (CborLengthType.definite, ""),
+  };
+  if (lengthType == CborLengthType.indefinite) {
+    throw NotSupportedError("Indefinite-length CBOR $kind in the transaction body; Ledger can't reproduce this body");
+  }
+
+  if (value is CborMap) {
+    final keys = value.keys.toList();
+    if (keys.every((key) => key is CborInt)) {
+      final intKeys = keys.cast<CborInt>().map((key) => key.toBigInt()).toList();
+      for (var i = 1; i < intKeys.length; i++) {
+        if (intKeys[i] <= intKeys[i - 1]) {
+          throw NotSupportedError("CBOR map keys are not in ascending order; Ledger can't reproduce this body");
+        }
+      }
+    }
+    value.forEach((key, item) {
+      _assertLedgerReproducible(key);
+      _assertLedgerReproducible(item);
+    });
+  } else if (value is CborList) {
+    value.forEach(_assertLedgerReproducible);
+  }
 }

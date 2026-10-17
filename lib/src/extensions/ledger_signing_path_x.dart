@@ -19,9 +19,10 @@ extension LedgerSigningPathX on LedgerSigningPath {
       LedgerSigningPath_Shelley() => (await cardanoPubAcc.rolePublicKey(path.role.bip32KeyRole, path.address)) //
           .rawKey
           .toUint8List(),
-      LedgerSigningPath_Byron() => (await cardanoPubAcc.rolePublicKey(Bip32KeyRole.payment, path.address)) //
-          .rawKey
-          .toUint8List(),
+      // 44' keys are not children of the 1852' account key; the Shelley payment key here would be the wrong vkey.
+      LedgerSigningPath_Byron() => throw UnsupportedError(
+          "Byron keys cannot be derived from a Shelley account public key",
+        ),
       LedgerSigningPath_CIP36() => throw UnimplementedError(),
       LedgerSigningPath_Custom() => throw UnimplementedError(),
     };

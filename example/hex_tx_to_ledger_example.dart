@@ -23,7 +23,7 @@ void main() async {
 
   // print("This is a test message!!".utf8ToHex());
 
-    final vespr = CoseSign1.deserialize(
+  final vespr = CoseSign1.deserialize(
     cborDecode(
       "845846a20127676164647265737358390114c16d7f43243bd81478e68b9db53a8528fd4fb1078d58d54a7f11241d227aefa4b773149170885aadba30aab3127cc611ddbc4999def61ca166686173686564f5581ce42f32f729bef4cef2318d2a620c6811f072b4f6ad950c96828588a358403089d0419a48f3d93c74cea0b850f26b29a778c860b1219b58005a8c4443de0234d37db509d7c457161aa1f9e3fa69937904893b9b3b9c254aa019f5f0fa2403"
           .hexDecode(),
@@ -39,7 +39,6 @@ void main() async {
     ),
   );
   print(eternl.toJson(prettyPrint: true));
-
 
   return;
 
