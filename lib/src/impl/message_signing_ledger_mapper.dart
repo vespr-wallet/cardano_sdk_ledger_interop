@@ -3,7 +3,13 @@ import "package:cardano_dart_types/cardano_dart_types.dart" hide AddressType;
 import "package:cardano_flutter_sdk/cardano_flutter_sdk.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
+import "../cip129.dart";
 import "../utils/derivation_utils.dart";
+
+// Hex lengths of the accepted signer forms
+const _credentialHexLength = 28 * 2; // bare key hash: payment, stake, DRep CIP-105, CC
+const _governanceIdHexLength = 29 * 2; // CIP-129 id, or a reward or enterprise address
+const _baseAddressHexLength = 57 * 2;
 
 class MessageSigningLedgerMapper {
   const MessageSigningLedgerMapper();
@@ -29,7 +35,8 @@ class MessageSigningLedgerMapper {
     final hashPayload = shouldHashPayload ?? false;
 
     // if it's a bech32, keep its prefix and convert it to hex
-    final bech32Hrp = ["addr", "stake", "drep", "cc_hot", "cc_cold"].any(requestedSignerRaw.startsWith)
+    final bech32Prefixes = ["addr", "stake", ...Cip129KeyType.values.map((keyType) => keyType.hrp)];
+    final bech32Hrp = bech32Prefixes.any(requestedSignerRaw.startsWith)
         ? requestedSignerRaw.substring(0, requestedSignerRaw.lastIndexOf("1"))
         : null;
     final requestedSignerHex = bech32Hrp == null ? requestedSignerRaw : requestedSignerRaw.bech32ToHex();
@@ -45,15 +52,6 @@ class MessageSigningLedgerMapper {
       }
     }
 
-    // CIP-105 / CIP-129 bech32 prefixes of the governance key types
-    String? governanceHrp(ShelleyAddressRole role) => switch (role) {
-          ShelleyAddressRole.drepCredential => "drep",
-          ShelleyAddressRole.constitutionalCommitteeHot => "cc_hot",
-          ShelleyAddressRole.constitutionalCommitteeCold => "cc_cold",
-          // ponytail: bare payment and stake key hashes have no signData bech32 form, so their prefix is not checked
-          ShelleyAddressRole.payment || ShelleyAddressRole.change || ShelleyAddressRole.stake => null,
-        };
-
     ParsedMessageData dataFromAnyCreds(String credsHex) {
       final signingPath = derivedCredsToSigningPath[credsHex];
       if (signingPath == null) {
@@ -62,7 +60,8 @@ class MessageSigningLedgerMapper {
           searchedAddressesCount: deriveMaxAddressCount,
         );
       }
-      requireHrp(governanceHrp(signingPath.role));
+      // ponytail: bare payment and stake key hashes have no signData bech32 form, so their prefix is not checked
+      requireHrp(Cip129KeyType.byRole(signingPath.role)?.hrp);
 
       final parsedAddressParams = switch (signingPath.role) {
         ShelleyAddressRole.payment || ShelleyAddressRole.change => ParsedAddressParams.shelley(
@@ -132,7 +131,7 @@ class MessageSigningLedgerMapper {
         // The device rebuilds the address from the paths, so only a key/key base address with our own stake key is
         // ours to sign for; anything else would be signed as a different address.
         CardanoAddressBase()
-            when requestedSigningAddress.bytes.first >> 4 != AddressType.basePaymentKeyStakeKey.value ||
+            when requestedSigningAddress.bytes.first.highNibble != AddressType.basePaymentKeyStakeKey.value ||
                 requestedSigningAddress.stakeCredentials != stakeCredentialsHex =>
           throw SigningAddressNotFoundException(
             missingAddresses: {requestedSigningAddress.bech32Encoded},
@@ -163,12 +162,20 @@ class MessageSigningLedgerMapper {
       return parsedMessageData;
     }
 
-    // CIP-129 id: the header's high nibble is the key type (0 CC hot, 1 CC cold, 2 DRep) and the low nibble the
-    // credential type (2 key hash, 3 script hash). The key behind the id must be the wallet key of that type.
-    ParsedMessageData dataFromGovernanceId(ShelleyAddressRole role) {
-      requireHrp(governanceHrp(role));
-      final signingPath = derivedCredsToSigningPath[requestedSignerHex.substring(2)];
-      if (signingPath == null || signingPath.role != role) {
+    // CIP-129 id: only a key-hash id of a key type the wallet derives can be signed; script-hash ids and reserved key
+    // types are refused. The key behind the id must be the wallet key of that type.
+    ParsedMessageData dataFromGovernanceId(int header) {
+      final keyType = Cip129KeyType.byHighNibble(header.highNibble);
+      if (keyType == null || header.lowNibble != Cip129CredentialType.keyHash.value) {
+        throw SigningAddressNotValidException(
+          hexInvalidAddressOrCredential: requestedSignerHex,
+          signingContext: "When signing payload message",
+        );
+      }
+      requireHrp(keyType.hrp);
+      final credentialHex = requestedSignerHex.substring(2); // after the header byte
+      final signingPath = derivedCredsToSigningPath[credentialHex];
+      if (signingPath == null || signingPath.role != keyType.role) {
         throw SigningAddressNotFoundException(
           missingAddresses: {requestedSignerRaw},
           searchedAddressesCount: deriveMaxAddressCount,
@@ -178,21 +185,15 @@ class MessageSigningLedgerMapper {
     }
 
     final data = switch (requestedSignerHex.length) {
-      // Bare credential hex (payment, stake, DRep CIP-105, CC)
-      56 => dataFromAnyCreds(requestedSignerHex),
-      // 29 bytes: a CIP-129 governance id, or a reward or enterprise address (header low nibble 0 or 1)
-      58 => switch (requestedSignerHex.hexDecode().first) {
-          0x02 => dataFromGovernanceId(ShelleyAddressRole.constitutionalCommitteeHot),
-          0x12 => dataFromGovernanceId(ShelleyAddressRole.constitutionalCommitteeCold),
-          0x22 => dataFromGovernanceId(ShelleyAddressRole.drepCredential),
-          // Script-hash ids and reserved key types: no Ledger key can sign for these
-          final header when header & 0x0f > 1 => throw SigningAddressNotValidException(
-              hexInvalidAddressOrCredential: requestedSignerHex,
-              signingContext: "When signing payload message",
-            ),
-          _ => dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
+      _credentialHexLength => dataFromAnyCreds(requestedSignerHex),
+      // Reward and enterprise addresses are as long as a CIP-129 id; they carry the network id in the header's low
+      // nibble where the id carries its credential type
+      _governanceIdHexLength => switch (requestedSignerHex.hexDecode().first) {
+          final header when NetworkId.values.any((network) => network.intValue == header.lowNibble) =>
+            dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
+          final header => dataFromGovernanceId(header),
         },
-      114 => dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
+      _baseAddressHexLength => dataFromAddress(CardanoAddress.fromHexString(requestedSignerHex)),
       _ => throw SigningAddressNotValidException(
           hexInvalidAddressOrCredential: requestedSignerHex,
           signingContext: "When signing payload message",
