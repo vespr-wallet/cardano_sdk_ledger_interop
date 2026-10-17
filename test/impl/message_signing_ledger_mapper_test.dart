@@ -493,6 +493,33 @@ void main() async {
             );
           }
         });
+
+        test("a bech32 prefix that disagrees with the payload is rejected", () async {
+          final rewardAddressHex = (await ledgerPubAccount.stakeAddress(NetworkId.mainnet)).bech32ToHex();
+          final baseAddressHex = (await ledgerPubAccount.paymentAddress(0, NetworkId.mainnet)).hexEncoded;
+          for (final signer in [
+            // CIP-129 ids under another key type's prefix
+            "02${cases.first.credential}".hexDecode().bech32Encode("drep"),
+            ledgerPubAccount.dRepDerivation.value.dRepIdNewHex.hexDecode().bech32Encode("cc_hot"),
+            // CIP-105 28-byte CC hot key hash under the DRep prefix
+            cases.first.credential.hexDecode().bech32Encode("drep"),
+            // addresses under a governance or the wrong address prefix
+            rewardAddressHex.hexDecode().bech32Encode("drep"),
+            baseAddressHex.hexDecode().bech32Encode("stake"),
+          ]) {
+            await expectLater(
+              () => mapper.toParsedMessageData(
+                xPubBech32: xPubBech32,
+                accountIndex: 0,
+                deriveMaxAddressCount: 1,
+                messageHex: payloadHex,
+                requestedSignerRaw: signer,
+              ),
+              throwsA(isA<SigningAddressNotValidException>()),
+              reason: signer,
+            );
+          }
+        });
       });
 
       group("Error Cases", () {
