@@ -434,6 +434,11 @@ void main() async {
         expect(map(tx("a3009f${input}ff0181${output}02$fee")), rejectedBecause("Indefinite-length CBOR list"));
       });
 
+      test("rejects indefinite-length inputs inside a tagged set", () {
+        // package:cbor attaches tag 258 to the list itself, so the walker sees the list and its length type
+        expect(map(tx("a300d901029f${input}ff0181${output}02$fee")), rejectedBecause("Indefinite-length CBOR list"));
+      });
+
       test("rejects indefinite-length votes map of a voter", () {
         final voter = "8202581c${"dd" * 28}";
         final vote = "825820${"ee" * 32}008201f6";
