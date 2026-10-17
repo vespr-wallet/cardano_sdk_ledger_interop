@@ -1,4 +1,5 @@
-import "package:cardano_dart_types/cardano_dart_types.dart";
+// AddressType is the ledger_cardano_plus enum: its value is the Shelley address header type nibble
+import "package:cardano_dart_types/cardano_dart_types.dart" hide AddressType;
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
 import "../types.dart";
@@ -38,12 +39,13 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
         paymentCredsToSigningPath[destinationCredentials] ?? changeCredsToSigningPath[destinationCredentials];
 
     // The device rebuilds a device-owned address from the params, so the params must describe the exact address type.
-    // Shelley header high nibble: 0 = base key/key, 6 = enterprise key. Anything else that still has our payment key
-    // (base key/script 2, pointer 4) is forwarded verbatim as third party.
-    // ponytail: map 2 and 4 to basePaymentKeyStakeScript / pointerKey if a wallet ever derives such addresses.
+    // Only base key/key and enterprise key addresses have params we can derive; anything else that still has our
+    // payment key (base key/script, pointer) is forwarded verbatim as third party. Unassigned header types are null.
+    // ponytail: map basePaymentKeyStakeScript / pointerKey to their params if a wallet ever derives such addresses.
     final headerType = destinationCardanoAddress.bytes.first >> 4;
-    final destination = switch ((maybeDestinationPath, headerType, destinationStakeCredentialsHex)) {
-      (final path?, 0x0, final stakeHex?) => ParsedOutputDestination.deviceOwned(
+    final addressType = AddressType.values.where((type) => type.value == headerType).firstOrNull;
+    final destination = switch ((maybeDestinationPath, addressType, destinationStakeCredentialsHex)) {
+      (final path?, AddressType.basePaymentKeyStakeKey, final stakeHex?) => ParsedOutputDestination.deviceOwned(
           addressParams: ParsedAddressParams.shelley(
             shelleyAddressParams: ShelleyAddressParamsData.basePaymentKeyStakeKey(
               spendingDataSource: SpendingDataSourcePath(path: path),
@@ -56,7 +58,7 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
             ),
           ),
         ),
-      (final path?, 0x6, _) => ParsedOutputDestination.deviceOwned(
+      (final path?, AddressType.enterpriseKey, _) => ParsedOutputDestination.deviceOwned(
           addressParams: ParsedAddressParams.shelley(
             shelleyAddressParams: ShelleyAddressParamsData.enterpriseKey(
               spendingDataSource: SpendingDataSourcePath(path: path),
