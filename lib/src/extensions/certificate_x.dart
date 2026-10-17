@@ -1,6 +1,7 @@
 import "package:cardano_dart_types/cardano_dart_types.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
+import "../errors/errors.dart";
 import "anchor_x.dart";
 import "credential_x.dart";
 import "drep_x.dart";
@@ -58,40 +59,13 @@ extension CertificateX on Certificate {
           ),
           deposit: cert.coin.toBigInt(),
         ),
-      Certificate_PoolRegistration() => ParsedCertificate.stakePoolRegistration(
-          pool: ParsedPoolParams(
-            cost: cert.cost.toBigInt(),
-            pledge: cert.pledge.toBigInt(),
-            margin: ParsedMargin(denominator: cert.margin.denominator, numerator: cert.margin.numerator),
-            metadata: cert.poolMetadata == null
-                ? null
-                : ParsedPoolMetadata(
-                    url: cert.poolMetadata!.metadataUrl,
-                    hashHex: cert.poolMetadata!.metadataHashHex.value,
-                  ),
-            rewardAccount: cert.rewardAccount.hexEncode() == stakeCredsHex
-                ? ParsedPoolRewardAccount.deviceOwned(
-                    path: LedgerSigningPath.shelley(account: accountIndex, address: 0, role: ShelleyAddressRole.stake),
-                  )
-                : ParsedPoolRewardAccount.thirdParty(rewardAccountHex: cert.rewardAccount.hexEncode()),
-            vrfHashHex: cert.vrfKeyHash.hexEncode(),
-            owners: cert.poolOwners
-                .map(
-                  // TODOincorrect mapping here
-                  (owner) => ParsedPoolOwner.thirdParty(hashHex: owner.hexEncode()),
-                )
-                .toList(),
-            // TODOincorrect mapping here
-            poolKey: ParsedPoolKey.thirdParty(hashHex: cert.operator.poolKeyHash.hexEncode()),
-            // TODOincorrect mapping here
-            relays: [],
-          ),
-        ),
-      Certificate_PoolRetirement() => ParsedCertificate.stakePoolRetirement(
-          // TODOlikely incorrect mapping here
-          path: LedgerSigningPath.shelley(account: accountIndex, address: 0, role: ShelleyAddressRole.stake),
-          retirementEpoch: cert.epoch.toBigInt(),
-        ),
+      // Pool certificates need the pool cold key (1853') or owner/operator mappings this package doesn't derive.
+      // The old mapping dropped relays and sent the stake path as the pool key, so the device would have signed a
+      // different certificate; failing here keeps the device out of it.
+      Certificate_PoolRegistration() =>
+        throw NotSupportedError("Pool registration certificates are not supported for Ledger signing"),
+      Certificate_PoolRetirement() =>
+        throw NotSupportedError("Pool retirement certificates are not supported for Ledger signing"),
       Certificate_VoteDelegation() => ParsedCertificate.voteDelegation(
           stakeCredential: cert.stakeCredential.toParsedCredential(
             accountIndex: accountIndex,
@@ -175,6 +149,7 @@ extension CertificateX on Certificate {
             role: ShelleyAddressRole.constitutionalCommitteeCold,
             walletCredsHex: coldCredentialKeyHashHex,
           ),
+          anchor: cert.anchor?.toParsedAnchor(),
         ),
       Certificate_RegisterDRep() => ParsedCertificate.dRepRegistration(
           dRepCredential: cert.dRepCredential.toParsedCredential(
@@ -184,6 +159,7 @@ extension CertificateX on Certificate {
             walletCredsHex: dRepKeyHashHex,
           ),
           deposit: cert.coin.toBigInt(),
+          anchor: cert.anchor?.toParsedAnchor(),
         ),
       Certificate_UnregisterDRep() => ParsedCertificate.dRepDeregistration(
           dRepCredential: cert.dRepCredential.toParsedCredential(
