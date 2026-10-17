@@ -10,6 +10,9 @@
 - [Breaking] Removed `cip08SignHashThreshold`. By default a message is hashed only when it does not fit the device's first chunk unhashed: 198 bytes when displayable as text, 99 bytes otherwise (`ledger_cardano_plus` limits). Plain-text messages between 50 and 198 bytes are no longer hashed by default; pass `shouldHashPayload` to force either behaviour
 - Message signing for a base address requires a key/key header and the wallet's own stake key; a base address with a foreign stake credential or a script stake part throws `SigningAddressNotFoundException` instead of being signed as the wallet's base address
 - CIP-129 constitutional committee hot and cold ids resolve to the wallet's CC keys; they were checked only against the DRep credential and reported as not found. The id's header is now validated: the key type must match the wallet key found behind it (`SigningAddressNotFoundException` otherwise), and script-hash or reserved headers throw `SigningAddressNotValidException`
+- [Breaking] `SignedTransactionDataX.witnessesVKey` takes named `cardanoPubAcc` and `tx` arguments and throws `InvalidTransactionError` when the body hash the device signed differs from the hash of the transaction body as it serializes now (computed fresh, since `blake2bHash256Hex()` can return the hash cached at parse time even after `copyWith`), instead of returning witnesses for a different body
+- The transaction mapper throws `InvalidTransactionError` when a spent input or collateral is at a wallet base address whose payment key is beyond `maxDeriveAddressCount`; such inputs were silently treated as third party and the transaction would have been submitted without their witness
+- Byron witness paths throw `UnsupportedError` instead of returning the Shelley payment key as the witness vkey
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
 # 0.6.2
