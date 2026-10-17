@@ -81,6 +81,24 @@ class TransactionSigningLedgerMapper {
       }).nonNulls,
     );
 
+    // A spent UTxO at one of our base addresses whose payment key is past maxDeriveAddressCount would get no witness,
+    // so fail here instead of after the user approved on the device. External inputs in the map stay third party.
+    // ponytail: wallet enterprise addresses have no stake part to recognise them by; there the window is the caller's.
+    for (final input in [...body.inputs.data, ...?body.collateral?.data]) {
+      final utxo = "${input.transactionHash.hexValue}#${input.index}";
+      final addressBech32 = inputUtxoToAddress[utxo];
+      if (addressBech32 == null || inputUtxoToSigningPath.containsKey(utxo)) continue;
+      final address = CardanoAddress.fromBech32OrBase58(addressBech32);
+      // Script inputs that keep our stake key (DEX orders, contracts) need no payment-key witness: third party.
+      final isOurKeyAddress =
+          address.stakeCredentials == stakeCredentialsHex && address.credentialsType.value == CredentialType.key;
+      if (isOurKeyAddress) {
+        throw InvalidTransactionError(
+          "Input $utxo is at a wallet address whose payment key is beyond the first $maxDeriveAddressCount addresses",
+        );
+      }
+    }
+
     final parsedCertificates = body.certs?.certificates
         .map(
           (e) => e.toParsedCertificate(
