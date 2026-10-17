@@ -442,6 +442,50 @@ void main() async {
       });
     });
 
+    group("output destination by address type", () {
+      const walletPaymentCred = "14c16d7f43243bd81478e68b9db53a8528fd4fb1078d58d54a7f1124";
+      final paymentPath = LedgerSigningPath.shelley(account: 0, address: 0, role: ShelleyAddressRole.payment);
+
+      Future<ParsedOutputDestination> destinationOf(String addressHex) async {
+        final address = "58${(addressHex.length ~/ 2).toRadixString(16)}$addressHex";
+        final req = await map("84a30081825820${"aa" * 32}00018182${address}1a001e8480021a00030d40a0f5f6");
+        return req.ledgerSignRequest.tx.outputs.single.destination;
+      }
+
+      test("base key/key paying to our key is device owned", () async {
+        expect(
+          await destinationOf("01$walletPaymentCred${"33" * 28}"),
+          ParsedOutputDestination.deviceOwned(
+            addressParams: ParsedAddressParams.shelley(
+              shelleyAddressParams: ShelleyAddressParamsData.basePaymentKeyStakeKey(
+                spendingDataSource: SpendingDataSourcePath(path: paymentPath),
+                stakingDataSource: StakingDataSource.keyHash(keyHashHex: "33" * 28),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test("enterprise paying to our key is device owned", () async {
+        expect(
+          await destinationOf("61$walletPaymentCred"),
+          ParsedOutputDestination.deviceOwned(
+            addressParams: ParsedAddressParams.shelley(
+              shelleyAddressParams: ShelleyAddressParamsData.enterpriseKey(
+                spendingDataSource: SpendingDataSourcePath(path: paymentPath),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test("base key/script and pointer paying to our key are third party", () async {
+        for (final addressHex in ["21$walletPaymentCred${"33" * 28}", "41${walletPaymentCred}000000"]) {
+          expect(await destinationOf(addressHex), ParsedOutputDestination.thirdParty(addressHex: addressHex));
+        }
+      });
+    });
+
     test("forwards body metadata hash, not the attached aux data hash", () async {
       for (final txHex in [
         // key 7 set, no aux data

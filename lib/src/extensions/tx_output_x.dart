@@ -1,4 +1,5 @@
-import "package:cardano_dart_types/cardano_dart_types.dart";
+// AddressType is the ledger_cardano_plus enum: its value is the Shelley address header type nibble
+import "package:cardano_dart_types/cardano_dart_types.dart" hide AddressType;
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
 
 import "../types.dart";
@@ -37,28 +38,35 @@ extension CardanoTransactionOutputX on CardanoTransactionOutput {
     final maybeDestinationPath =
         paymentCredsToSigningPath[destinationCredentials] ?? changeCredsToSigningPath[destinationCredentials];
 
-    final destination = maybeDestinationPath != null
-        ? ParsedOutputDestination.deviceOwned(
-            addressParams: ParsedAddressParams.shelley(
-              shelleyAddressParams: destinationStakeCredentialsHex == null
-                  ? ShelleyAddressParamsData.enterpriseKey(
-                      spendingDataSource: SpendingDataSourcePath(path: maybeDestinationPath),
+    // The device rebuilds a device-owned address from the params, so the params must describe the exact address type.
+    // Only base key/key and enterprise key addresses have params we can derive; anything else that still has our
+    // payment key (base key/script, pointer) is forwarded verbatim as third party. Unassigned header types are null.
+    // ponytail: map basePaymentKeyStakeScript / pointerKey to their params if a wallet ever derives such addresses.
+    final headerType = destinationCardanoAddress.bytes.first >> 4;
+    final addressType = AddressType.values.where((type) => type.value == headerType).firstOrNull;
+    final destination = switch ((maybeDestinationPath, addressType, destinationStakeCredentialsHex)) {
+      (final path?, AddressType.basePaymentKeyStakeKey, final stakeHex?) => ParsedOutputDestination.deviceOwned(
+          addressParams: ParsedAddressParams.shelley(
+            shelleyAddressParams: ShelleyAddressParamsData.basePaymentKeyStakeKey(
+              spendingDataSource: SpendingDataSourcePath(path: path),
+              stakingDataSource: stakingCredentialsHex == stakeHex
+                  ? StakingDataSource.keyPath(
+                      path:
+                          LedgerSigningPath.shelley(account: accountIndex, address: 0, role: ShelleyAddressRole.stake),
                     )
-                  : ShelleyAddressParamsData.basePaymentKeyStakeKey(
-                      spendingDataSource: SpendingDataSourcePath(path: maybeDestinationPath),
-                      stakingDataSource: stakingCredentialsHex == destinationStakeCredentialsHex
-                          ? StakingDataSource.keyPath(
-                              path: LedgerSigningPath.shelley(
-                                account: accountIndex,
-                                address: 0,
-                                role: ShelleyAddressRole.stake,
-                              ),
-                            )
-                          : StakingDataSource.keyHash(keyHashHex: destinationStakeCredentialsHex),
-                    ),
+                  : StakingDataSource.keyHash(keyHashHex: stakeHex),
             ),
-          )
-        : ParsedOutputDestination.thirdParty(addressHex: destinationAddressHex);
+          ),
+        ),
+      (final path?, AddressType.enterpriseKey, _) => ParsedOutputDestination.deviceOwned(
+          addressParams: ParsedAddressParams.shelley(
+            shelleyAddressParams: ShelleyAddressParamsData.enterpriseKey(
+              spendingDataSource: SpendingDataSourcePath(path: path),
+            ),
+          ),
+        ),
+      _ => ParsedOutputDestination.thirdParty(addressHex: destinationAddressHex),
+    };
 
     final tokenBundle = output.value.multiAssets
         .map((multiAsset) => ParsedAssetGroup(
