@@ -3,6 +3,7 @@
 - Updated `ledger_cardano_plus` to ^0.6.3, which requires `ledger_flutter_plus` ^2.0.0 and so `universal_ble` 3. The interop API and the APDU mapping are unchanged (`ledger_cardano_plus` 0.6.3 has the same `lib/` as 0.6.2), but apps that use `universal_ble` directly get its 3.0.0 breaking changes; see the [ledger_flutter_plus 2.0.0 changelog](https://pub.dev/packages/ledger_flutter_plus/changelog#200)
 - Updated `cardano_flutter_sdk` to ^5.5.0 (`cardano_dart_types` 3.3.0), the versions this release is tested against
 - Toolchain: Flutter 3.50.0 (Dart 3.14.0) for development and CI; the minimum Dart SDK constraint is unchanged
+- Fixed the package description, which described a data models package instead of the SDK to Ledger mapping
 
 # 0.7.0
 

@@ -1,5 +1,5 @@
 name: cardano_sdk_ledger_interop
-description: Part of Cardano Flutter SDK containing the data models.
+description: Maps cardano_flutter_sdk transactions, messages and wallet keys to ledger_cardano_plus signing requests, and Ledger signatures back to transaction witnesses.
 version: 0.8.0
 homepage: https://github.com/vespr-wallet/cardano_sdk_ledger_interop
 repository: https://github.com/vespr-wallet/cardano_sdk_ledger_interop
