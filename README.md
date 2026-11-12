@@ -33,9 +33,9 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cardano_sdk_ledger_interop: ^0.7.0
-  cardano_flutter_sdk: ^5.2.0
-  ledger_cardano_plus: ^0.6.1
+  cardano_sdk_ledger_interop: ^0.8.0
+  cardano_flutter_sdk: ^5.5.0
+  ledger_cardano_plus: ^0.6.3
   cardano_dart_types: # version as required by cardano_flutter_sdk
 ```
 

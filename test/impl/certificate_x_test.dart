@@ -1,8 +1,6 @@
 import "dart:typed_data";
 
 import "package:cardano_dart_types/cardano_dart_types.dart";
-// RationalNumber is not exported by cardano_dart_types 3.1.2 even though Certificate.poolRegistration requires it.
-import "package:cardano_dart_types/src/cardano/shared/rational_number.dart";
 import "package:cardano_sdk_ledger_interop/cardano_sdk_ledger_interop.dart";
 import "package:cardano_sdk_ledger_interop/src/extensions/certificate_x.dart";
 import "package:ledger_cardano_plus/ledger_cardano_plus_models.dart";
