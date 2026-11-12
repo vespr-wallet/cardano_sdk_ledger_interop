@@ -1,11 +1,11 @@
-# 0.8.0
+## 0.8.0
 
 - Updated `ledger_cardano_plus` to ^0.6.3, which requires `ledger_flutter_plus` ^2.0.0 and so `universal_ble` 3. The interop API and the APDU mapping are unchanged (`ledger_cardano_plus` 0.6.3 has the same `lib/` as 0.6.2), but apps that use `universal_ble` directly get its 3.0.0 breaking changes; see the [ledger_flutter_plus 2.0.0 changelog](https://pub.dev/packages/ledger_flutter_plus/changelog#200)
 - Updated `cardano_flutter_sdk` to ^5.5.0 (`cardano_dart_types` 3.3.0), the versions this release is tested against
 - Toolchain: Flutter 3.50.0 (Dart 3.14.0) for development and CI; the minimum Dart SDK constraint is unchanged
 - Fixed the package description, which described a data models package instead of the SDK to Ledger mapping
 
-# 0.7.0
+## 0.7.0
 
 - [Breaking] Updated `cardano_flutter_sdk` dependency to ^5.2.0 (`cardano_dart_types` 3.1.2)
 - Adapted the voting procedures mapper to the new `VotingProcedures.voting` shape (each voter's votes paired with their CBOR length type)
@@ -26,126 +26,126 @@
 - Byron witness paths throw `UnsupportedError` instead of returning the Shelley payment key as the witness vkey
 - Removed the leftover `freezed` and `json_serializable` build configuration and the unused `build_runner` dev dependency
 
-# 0.6.2
+## 0.6.2
 
 - Updated `ledger_cardano_plus` to ^0.6.1
 
-# 0.6.1
+## 0.6.1
 
 - Updated `ledger_cardano_plus` to ^0.5.10
 - Added Ledger Cardano app v8 mappings for combined Conway delegation certificates
 - Fixed Conway stake deregistration certificate mapping
 
-# 0.6.0
+## 0.6.0
 
 - [Breaking] Updated cardano_flutter_sdk dependency to ^4.0.0
 - Adapted mappers to new SDK API
 
-# 0.5.9
+## 0.5.9
 
 - Updated Cardano SDK dependency to ^3.0.0
 
-# 0.5.8
+## 0.5.8
 
 - Added option to enforce whether payload should be hashed for MessageSigning
 
-# 0.5.7
+## 0.5.7
 
 - Support for Ledger Message Signing mapping
 
-# 0.5.6
+## 0.5.6
 
 - Removed freezed dependency
 
-# [0.5.5+1] - June 30, 2025
+## [0.5.5+1] - June 30, 2025
 
 - Improved and expanded the README documentation for open-source/public use. No code changes.
 
-# [0.5.5] - June 30, 2025
+## [0.5.5] - June 30, 2025
 
-## Changes
+### Changes
 
 - Updated deps
 
-# [0.5.3] - 20th of November 2024
+## [0.5.3] - 20th of November 2024
 
-## Bug Fixes
+### Bug Fixes
 
 - Updated deps to fix build with latest cardano sdk version
 
-# [0.5.2] - 3rd of October
+## [0.5.2] - 3rd of October
 
-## Bug Fixes
+### Bug Fixes
 
 - Updated types version and fixed runtime issues
 
-# [0.5.1] - 26th of September
+## [0.5.1] - 26th of September
 
-## Bug Fixes
+### Bug Fixes
 
 - Fixed stake credential being used always to sign certs (instead of stake/dRep/ccHot/ccCold as applicable)
 
-# [0.5.0] - 26th of September
+## [0.5.0] - 26th of September
 
-## Changes
+### Changes
 
 - Updated cardano sdk to fix some conway cbor parsing/encoding bugs
 
-# [0.4.2] - 25th of September
+## [0.4.2] - 25th of September
 
-## Changes
+### Changes
 
 - Updated tx mapper to include voting procedures
 
-# [0.4.1] - 4th of September
+## [0.4.1] - 4th of September
 
-## Changes
+### Changes
 
 - Fixed tx mapping issues for the new governance keys
 
-# [0.4.0] - 4th of September
+## [0.4.0] - 4th of September
 
-## Changes
+### Changes
 
 - [Breaking] Updated sdk and types dependencies
 - Fixed some issues when identifying creds to sign with for drep and CC keys
 
-# [0.3.1] - 26th of August
+## [0.3.1] - 26th of August
 
-## Changes
-
-- Updated sdk and types dependencies
-
-# [0.3.0] - 26th of August
-
-## Changes
+### Changes
 
 - Updated sdk and types dependencies
 
-# [0.2.3] - 20th of August
+## [0.3.0] - 26th of August
 
-## BugFix
+### Changes
+
+- Updated sdk and types dependencies
+
+## [0.2.3] - 20th of August
+
+### BugFix
 
 - Fixed outputs parsing looking at more device-owned addresses
 - Updated ledger_cardano_plus
 
-# [0.2.2] - 17th of August
+## [0.2.2] - 17th of August
 
-## BugFix
+### BugFix
 
 - Included missing datum hash mapping for alonzo outputs
 
-# [0.2.1] - 12th of August
+## [0.2.1] - 12th of August
 
-## BugFix
+### BugFix
 
 - Corrected inline datum mapping
 
-# [0.2.0] - 12th of August
+## [0.2.0] - 12th of August
 
 - Updated to also return the ledger pub account when mapping to ledger signature request
 - Added mapping from ledger signature to witness
 
-# [0.1.0] - 25th of July
+## [0.1.0] - 25th of July
 
 - Initial release
