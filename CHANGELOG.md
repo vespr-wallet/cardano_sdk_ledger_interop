@@ -1,3 +1,7 @@
+## Unreleased
+
+- Tooling: Flutter 3.50.1 (still Dart 3.14.0) for development and CI; the minimum Dart SDK constraint is unchanged
+
 ## 0.8.0
 
 - Updated `ledger_cardano_plus` to ^0.6.3, which requires `ledger_flutter_plus` ^2.0.0 and so `universal_ble` 3. The interop API and the APDU mapping are unchanged (`ledger_cardano_plus` 0.6.3 has the same `lib/` as 0.6.2), but apps that use `universal_ble` directly get its 3.0.0 breaking changes; see the [ledger_flutter_plus 2.0.0 changelog](https://pub.dev/packages/ledger_flutter_plus/changelog#200)
