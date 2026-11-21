@@ -1,6 +1,7 @@
 ## Unreleased
 
 - Tooling: Flutter 3.50.1 (still Dart 3.14.0) for development and CI; the minimum Dart SDK constraint is unchanged
+- CI: the PR workflow fails on unformatted Dart code (`dart format --set-exit-if-changed`); the code already passed, so nothing was reformatted
 
 ## 0.8.0
 
